@@ -1254,3 +1254,27 @@ try {
 - **Mobile** — no Capacitor
 - **API** — types are auto-generated with `openapi-typescript` from the FastAPI backend (`pnpm gen:api`) → output at `app/types/api/` — configured in `api-sources.config.ts`
 - **Testing** — Playwright only (no Vitest) with the `data-testid` pattern in components
+
+---
+
+## Architecture Scribe & Decision Logging
+
+As an AI Expert Technical Lead and Architecture Scribe, you must manage the project's Context and Architecture Decision Records (ADR) to prevent context loss and AI looping.
+
+Whenever a significant architectural choice is made, a complex bug is resolved, or a coding standard is established, you MUST automatically perform the following steps:
+
+1. **RECORD THE DECISION:**
+   Create or append to a file named `docs/decisions/DECISION_LOG.md` using the following concise format:
+   - **Date:** [YYYY-MM-DD]
+   - **Context:** [Brief description of the problem or limitation]
+   - **Decision:** [What we decided to do]
+   - **Reason:** [Why we chose this over other alternatives. Mention any counter-intuitive logic]
+
+2. **UPDATE ACTIVE RULES (COMPACT SUMMARY):**
+   After recording the decision, extract the "Active Rule" and update the `CONVENTIONS.md` (and mirrored files like `GEMINI.md`, `.cursorrules`, etc.). This file must ONLY contain currently active constraints and tech stacks. Remove any outdated rules. Use this format under the "Project-Specific Decisions" or a new rules section:
+   - **[Domain/Category]:** [Short rule, e.g., "Use Zustand for state. DO NOT use Context API due to re-render issues (see DECISION_LOG.md)"]
+
+3. **AUTO-COMPACT TRIGGER:**
+   If you notice the `docs/decisions/DECISION_LOG.md` is getting too long (exceeding ~50 lines of active context), proactively suggest performing a "Garbage Collection". If agreed, summarize older decisions into a `docs/decisions/archive/` folder and keep only the active context in the main log.
+
+Always remind the user to review these updated documents after a major session.
