@@ -7,7 +7,7 @@
     @dragenter.prevent="onDragEnter"
     @dragleave.prevent="onDragLeave"
     @dragover.prevent
-    @drop.prevent="onDrop"
+    @drop.prevent.stop="onDrop"
     @click="item && $emit('open-detail')"
   >
     <!-- Empty Slot -->
