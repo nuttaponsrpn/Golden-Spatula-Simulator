@@ -2,14 +2,38 @@
   <ElementBaseModal :visible="true" title="เลือก Champion ตั้งต้น" @close="$emit('skip')">
     <div class="flex flex-col gap-4 p-4">
       <p class="text-sm text-gray-400">
-        เลือก champion ที่ต้องการล็อกไว้ในทีม (ไม่บังคับ) — AI จะจัดทีมโดยมี champion เหล่านี้อยู่เสมอ
-        <span v-if="selected.size > 0" class="text-white font-medium">({{ selected.size }} ตัว)</span>
+        เลือก champion ที่ต้องการล็อกไว้ในทีม (ไม่บังคับ) — AI จะจัดทีมโดยมี champion
+        เหล่านี้อยู่เสมอ
       </p>
 
-      <ElementBaseInput
-        v-model="searchQuery"
-        placeholder="ค้นหา champion..."
-      />
+      <!-- Selected champions row -->
+      <div v-if="selectedChampions.length > 0" class="flex flex-wrap gap-2">
+        <div
+          v-for="champ in selectedChampions"
+          :key="champ.id"
+          class="relative flex items-center gap-1.5 rounded-lg border px-2 py-1"
+          :style="{ borderColor: `var(--cost-${champ.cost})` }"
+        >
+          <img
+            :src="champ.imageUrl"
+            :alt="champ.name"
+            class="h-6 w-6 rounded object-cover"
+          />
+          <span class="text-xs text-gray-200">{{ champ.name }}</span>
+          <button
+            class="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full text-gray-400 hover:bg-gray-600 hover:text-white transition-colors"
+            :aria-label="`ลบ ${champ.name}`"
+            @click="toggle(champ.id)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="h-3 w-3">
+              <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <p v-else class="text-xs text-gray-600 italic">ยังไม่ได้เลือก champion ตั้งต้น</p>
+
+      <ElementBaseInput v-model="searchQuery" placeholder="ค้นหา champion..." />
 
       <div class="grid grid-cols-5 gap-2 max-h-80 overflow-y-auto sm:grid-cols-7">
         <button
@@ -31,29 +55,20 @@
           <span class="text-center text-[10px] leading-tight text-gray-300 line-clamp-1">
             {{ champion.name }}
           </span>
-          <span
-            :class="[
-              'absolute top-1 right-1 text-[9px] font-bold',
-              champion.cost === 5 ? 'text-cost-5' :
-              champion.cost === 4 ? 'text-cost-4' :
-              champion.cost === 3 ? 'text-cost-3' :
-              champion.cost === 2 ? 'text-cost-2' : 'text-cost-1',
-            ]"
-          >{{ champion.cost }}</span>
+
           <span
             v-if="selected.has(champion.id)"
             class="absolute top-0.5 left-1 text-[9px] font-bold text-cost-5"
-          >✓</span>
+            >✓</span
+          >
         </button>
       </div>
 
       <div class="flex gap-2 pt-2 border-t border-gray-800">
         <ElementBaseButton variant="primary" @click="confirm">
-          {{ selected.size > 0 ? `ยืนยัน ${selected.size} Champion` : 'ไม่ใช้ Champion ตั้งต้น' }}
+          {{ selected.size > 0 ? `ยืนยัน ${selected.size} Champion` : "ไม่ใช้ Champion ตั้งต้น" }}
         </ElementBaseButton>
-        <ElementBaseButton variant="secondary" @click="$emit('skip')">
-          ยกเลิก
-        </ElementBaseButton>
+        <ElementBaseButton variant="secondary" @click="$emit('skip')"> ยกเลิก </ElementBaseButton>
       </div>
     </div>
   </ElementBaseModal>
@@ -79,6 +94,12 @@ const filteredChampions = computed(() => {
 });
 
 const selected = ref(new Set<string>(props.initialIds ?? []));
+
+const selectedChampions = computed(() =>
+  [...selected.value]
+    .map((id) => champions.value.find((c) => c.id === id))
+    .filter((c): c is NonNullable<typeof c> => c !== undefined),
+);
 
 function toggle(id: string): void {
   if (selected.value.has(id)) {

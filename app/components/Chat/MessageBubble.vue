@@ -25,27 +25,27 @@
         <span v-html="formattedContent"></span>
 
         <div
-          v-if="compChampions.length > 0"
+          v-if="compUnits.length > 0"
           class="mt-4 pt-4 border-t border-gray-700"
         >
           <p class="text-xs font-semibold text-gray-400 mb-2">ฮีโร่ในทีม</p>
-          <div class="flex flex-wrap gap-1.5">
+          <div class="flex flex-wrap gap-2">
             <div
-              v-for="champ in compChampions"
-              :key="champ.unitId"
-              class="relative flex flex-col items-center gap-0.5"
-              :title="champ.name"
+              v-for="unit in compUnits"
+              :key="unit.unitId"
+              class="flex flex-col items-center gap-1"
+              :title="unit.name"
             >
               <div
                 :class="[
                   'w-10 h-10 rounded-full overflow-hidden border-2',
-                  costBorderClass(champ.cost),
+                  costBorderClass(unit.cost),
                 ]"
               >
                 <img
-                  v-if="champ.imageUrl"
-                  :src="champ.imageUrl"
-                  :alt="champ.name"
+                  v-if="unit.imageUrl"
+                  :src="unit.imageUrl"
+                  :alt="unit.name"
                   class="w-full h-full object-cover"
                   loading="lazy"
                 />
@@ -53,12 +53,28 @@
                   v-else
                   class="w-full h-full flex items-center justify-center text-xs font-bold text-gray-300 bg-gray-700"
                 >
-                  {{ champ.name[0] }}
+                  {{ unit.name[0] }}
                 </div>
               </div>
               <span class="text-[10px] text-gray-400 leading-none max-w-10 text-center truncate">
-                {{ champ.name }}
+                {{ unit.name }}
               </span>
+              <div class="flex gap-0.5">
+                <div
+                  v-for="(item, idx) in unit.items"
+                  :key="idx"
+                  class="w-3.5 h-3.5 rounded-sm overflow-hidden bg-gray-700"
+                  :title="item?.name ?? ''"
+                >
+                  <img
+                    v-if="item?.imageUrl"
+                    :src="item.imageUrl"
+                    :alt="item.name"
+                    class="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -92,7 +108,7 @@ const formattedContent = computed(() => {
   return formatMarkdown(props.message.displayContent);
 });
 
-const compChampions = computed(() => {
+const compUnits = computed(() => {
   if (!props.message.boardSnapshot) return [];
   return props.message.boardSnapshot.map((unit) => {
     const champ = getChampionById(unit.championId);
@@ -101,6 +117,7 @@ const compChampions = computed(() => {
       name: champ?.name ?? unit.championId,
       imageUrl: champ?.imageUrl ?? "",
       cost: champ?.cost ?? (1 as ChampionCost),
+      items: unit.items,
     };
   });
 });

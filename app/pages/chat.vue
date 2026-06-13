@@ -246,6 +246,7 @@ onMounted(async () => {
 function startNewSession(): void {
   // Discard any previous pending session that had no messages
   pendingSession.value = null;
+  anchorChampionIds.value = [];
   anchorSelectorIsNewSession.value = true;
   showAnchorSelector.value = true;
 }
@@ -367,7 +368,7 @@ function onRevisionChange(messageId: string): void {
 function onLoadToBoard(): void {
   if (!previewUnits.value) return;
   loadUnits(previewUnits.value);
-  navigateTo("/");
+  navigateTo("/builder");
 }
 
 onUnmounted(() => {

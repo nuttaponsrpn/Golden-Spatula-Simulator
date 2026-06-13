@@ -3,7 +3,7 @@ import type { AppError } from "~/types/app-error";
 
 export function useChatSessions() {
   const db = useChatDb();
-  const sessions = ref<ChatSession[]>([]);
+  const sessions = useState<ChatSession[]>("chat-sessions", () => []);
 
   async function loadSessions(): Promise<void> {
     const result = await db.getSessions();
