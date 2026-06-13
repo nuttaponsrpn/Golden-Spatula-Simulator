@@ -37,36 +37,37 @@ export function useDragDrop() {
 
   function setCustomDragImage(event: DragEvent, kind: DragSourceKind): void {
     if (!event.dataTransfer || !event.target) return;
-    
-    const target = event.target as HTMLElement;
 
-    if (kind === "item-picker") {
-      // For items, use the inner icon container as the drag image
-      const iconContainer = target.querySelector("div");
-      const dragElement = iconContainer || target;
-      
-      const width = dragElement.offsetWidth || 40;
-      const height = dragElement.offsetHeight || 40;
-      event.dataTransfer.setDragImage(dragElement, width / 2, height / 2);
-      return;
-    }
-    
-    // For champions/board units, find the image container
+    const target = event.target as HTMLElement;
     const img = target.tagName === "IMG" ? (target as HTMLImageElement) : target.querySelector("img");
-    
-    if (img) {
-      // Use the parent element (container) as the drag image to include borders/styles
-      const container = img.parentElement;
-      if (container && container.offsetWidth > 0) {
-        const width = container.offsetWidth;
-        const height = container.offsetHeight;
-        event.dataTransfer.setDragImage(container, width / 2, height / 2);
-      } else if (img.complete && img.naturalWidth > 0) {
-        const width = img.offsetWidth || 48;
-        const height = img.offsetHeight || 48;
-        event.dataTransfer.setDragImage(img, width / 2, height / 2);
-      }
-    }
+
+    if (!img || !img.complete || img.naturalWidth === 0) return;
+
+    const SIZE = kind === "item-picker" ? 40 : 52;
+
+    const ghost = document.createElement("div");
+    ghost.style.cssText = `
+      position: fixed;
+      top: -9999px;
+      left: -9999px;
+      width: ${SIZE}px;
+      height: ${SIZE}px;
+      border-radius: ${kind === "item-picker" ? "6px" : "50%"};
+      overflow: hidden;
+      background: #1f2937;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+    `;
+
+    const imgClone = document.createElement("img");
+    imgClone.src = img.src;
+    imgClone.style.cssText = "width:100%;height:100%;object-fit:cover;display:block;";
+    ghost.appendChild(imgClone);
+    document.body.appendChild(ghost);
+
+    event.dataTransfer.setDragImage(ghost, SIZE / 2, SIZE / 2);
+
+    // Remove after next frame — browser only needs it during the dragstart snapshot
+    requestAnimationFrame(() => ghost.remove());
   }
 
   function onPickerDragStart(event: DragEvent, championId: string): void {

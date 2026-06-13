@@ -18,6 +18,12 @@ body.is-dragging * {
   cursor: grabbing !important;
 }
 
+/* ── Touch drag: prevent browser scroll interception on draggable elements ── */
+[draggable="true"] {
+  touch-action: none;
+  user-select: none;
+}
+
 /* ── Custom Scrollbar ── */
 * {
   scrollbar-width: thin;
