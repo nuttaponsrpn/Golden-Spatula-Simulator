@@ -66,6 +66,7 @@ const props = defineProps<{
   board: TeamBoard;
   unitCount: number;
   maxUnits: number;
+  allowUpscale?: boolean;
 }>();
 
 defineEmits<{
@@ -95,9 +96,10 @@ onMounted(() => {
   onUnmounted(() => observer.disconnect());
 });
 
-const scale = computed(() =>
-  containerWidth.value < BOARD_WIDTH ? containerWidth.value / BOARD_WIDTH : 1,
-);
+const scale = computed(() => {
+  const ratio = containerWidth.value / BOARD_WIDTH;
+  return props.allowUpscale ? ratio : Math.min(ratio, 1);
+});
 
 const scaledHeight = computed(() => BOARD_HEIGHT * scale.value);
 
