@@ -149,7 +149,6 @@
       :is-board-full="isBoardFull"
       :is-champion-on-board="isChampionOnBoard"
       @close="isFullscreenOpen = false"
-      @champion-select="onChampionSelect"
       @cell-click="onCellClick"
       @remove="removeUnit"
       @clear="clearBoard"

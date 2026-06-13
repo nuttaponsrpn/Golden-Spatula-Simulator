@@ -7,11 +7,13 @@
  * unchanged on mobile.
  *
  * How it works:
- * 1. touchstart on a draggable element → fire dragstart + create ghost image
- * 2. touchmove → find the element under the finger → fire dragover on it
+ * 1. touchstart on a draggable element → record as "pending drag" (do not start yet)
+ * 2. touchmove beyond DRAG_THRESHOLD_PX → commit drag: fire dragstart + create ghost image
+ *    → find the element under the finger → fire dragover on it
  *    (also fires dragleave on the previous target and dragenter on the new one)
  *    → move the ghost image to follow the finger
- * 3. touchend → fire drop on the element under the finger, then dragend on source
+ * 3. touchend without drag started → let native click fire (tap to select)
+ *    touchend with drag started → fire drop on the element under the finger, then dragend
  *    → remove the ghost image
  * 4. touchcancel → fire dragend to reset state → remove the ghost image
  */
@@ -25,6 +27,12 @@ export default defineNuxtPlugin(() => {
   let ghostEl: HTMLElement | null = null;
   let ghostOffsetX = 0;
   let ghostOffsetY = 0;
+
+  // Pending drag — set on touchstart, committed only when touchmove exceeds threshold
+  let pendingDragSource: Element | null = null;
+  let pendingTouch: Touch | null = null;
+  let dragStarted = false;
+  const DRAG_THRESHOLD_PX = 8;
 
   // Synthetic DataTransfer — stores the key/value set by the draggable's dragstart handler
   // so that drop handlers can read it via event.dataTransfer.getData()
@@ -134,28 +142,41 @@ export default defineNuxtPlugin(() => {
       const draggable = findDraggable(target);
       if (!draggable) return;
 
-      // Reset shared transfer for new drag session
-      sharedTransfer.clearData();
-      dragSource = draggable;
-      lastDragOver = null;
-
-      dispatchDragEvent("dragstart", draggable, touch, sharedTransfer);
-      createGhost(draggable, touch);
-
-      // Prevent page scroll while dragging
-      e.preventDefault();
+      // Record intent but do NOT start the drag yet — wait for touchmove to exceed
+      // the threshold so a short tap can still fire the native click event.
+      pendingDragSource = draggable;
+      pendingTouch = touch;
+      dragStarted = false;
     },
-    { passive: false },
+    { passive: true },
   );
 
   document.addEventListener(
     "touchmove",
     (e: TouchEvent) => {
-      if (!dragSource) return;
-      e.preventDefault();
-
       const touch = e.touches[0];
       if (!touch) return;
+
+      // Commit drag session once the finger moves past the threshold
+      if (!dragStarted && pendingDragSource && pendingTouch) {
+        const dx = touch.clientX - pendingTouch.clientX;
+        const dy = touch.clientY - pendingTouch.clientY;
+        if (Math.sqrt(dx * dx + dy * dy) < DRAG_THRESHOLD_PX) return;
+
+        // Start the drag session now
+        sharedTransfer.clearData();
+        dragSource = pendingDragSource;
+        lastDragOver = null;
+        dragStarted = true;
+        pendingDragSource = null;
+        pendingTouch = null;
+
+        dispatchDragEvent("dragstart", dragSource, touch, sharedTransfer);
+        createGhost(dragSource, touch);
+      }
+
+      if (!dragSource) return;
+      e.preventDefault();
 
       moveGhost(touch);
 
@@ -182,6 +203,14 @@ export default defineNuxtPlugin(() => {
   );
 
   document.addEventListener("touchend", (e: TouchEvent) => {
+    // If drag never started (was just a tap), reset pending state and let the
+    // native click event through — no drag cleanup needed.
+    if (!dragStarted) {
+      pendingDragSource = null;
+      pendingTouch = null;
+      return;
+    }
+
     if (!dragSource) return;
 
     const touch = e.changedTouches[0];
@@ -189,6 +218,7 @@ export default defineNuxtPlugin(() => {
       removeGhost();
       dragSource = null;
       lastDragOver = null;
+      dragStarted = false;
       return;
     }
 
@@ -206,9 +236,13 @@ export default defineNuxtPlugin(() => {
 
     dragSource = null;
     lastDragOver = null;
+    dragStarted = false;
   });
 
   document.addEventListener("touchcancel", (e: TouchEvent) => {
+    pendingDragSource = null;
+    pendingTouch = null;
+
     if (!dragSource) return;
 
     removeGhost();
@@ -220,5 +254,6 @@ export default defineNuxtPlugin(() => {
 
     dragSource = null;
     lastDragOver = null;
+    dragStarted = false;
   });
 });
