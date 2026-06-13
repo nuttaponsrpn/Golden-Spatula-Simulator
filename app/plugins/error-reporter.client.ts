@@ -10,7 +10,9 @@ export default defineNuxtPlugin(() => {
   })
 
   window.onerror = (_message, _source, _line, _col, err) => {
-    const error = normalizeError(err ?? new Error('Unknown window error'))
+    // err is null for cross-origin script errors — browser withholds details by design; nothing actionable
+    if (!err) return true
+    const error = normalizeError(err)
     setGlobalError(error)
     if (import.meta.dev) {
       console.error('[onerror]', err)
