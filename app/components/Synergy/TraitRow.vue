@@ -1,10 +1,12 @@
 <template>
   <div
+    ref="rowRef"
     :class="[
-      'flex flex-col gap-1 rounded-lg p-2 transition-colors',
+      'flex flex-col gap-1 rounded-lg p-2 transition-colors cursor-pointer',
       activation.activeTier !== null ? 'bg-gray-800' : 'bg-gray-900/50 opacity-60',
     ]"
     data-testid="trait-row"
+    @click="onToggle"
   >
     <div class="flex items-center gap-2">
       <div
@@ -49,6 +51,12 @@
       เพิ่มอีก {{ activation.nextThreshold.count - activation.activeCount }} เพื่อ activate
     </p>
   </div>
+
+  <SynergyTraitTooltip
+    :activation="activation"
+    :visible="isHovered"
+    :anchor-rect="anchorRect"
+  />
 </template>
 
 <script setup lang="ts">
@@ -58,18 +66,44 @@ const props = defineProps<{
   activation: SynergyActivation;
 }>();
 
+const rowRef = ref<HTMLElement | null>(null);
+const isHovered = ref(false);
+const anchorRect = ref<DOMRect | null>(null);
+
+function onToggle(): void {
+  if (isHovered.value) {
+    isHovered.value = false;
+    return;
+  }
+  anchorRect.value = rowRef.value?.getBoundingClientRect() ?? null;
+  isHovered.value = true;
+}
+
+function onOutsideClick(e: MouseEvent): void {
+  if (rowRef.value && !rowRef.value.contains(e.target as Node)) {
+    isHovered.value = false;
+  }
+}
+
+watch(isHovered, (open) => {
+  if (open) {
+    document.addEventListener("click", onOutsideClick, { capture: true });
+  } else {
+    document.removeEventListener("click", onOutsideClick, { capture: true });
+  }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", onOutsideClick, { capture: true });
+});
+
 const tierBgClass = computed(() => {
   switch (props.activation.activeTier) {
-    case "bronze":
-      return "bg-amber-900 text-tier-bronze";
-    case "silver":
-      return "bg-gray-600 text-tier-silver";
-    case "gold":
-      return "bg-yellow-900 text-tier-gold";
-    case "prismatic":
-      return "bg-purple-900 text-tier-prismatic";
-    default:
-      return "bg-gray-700 text-gray-400";
+    case "bronze":   return "bg-amber-900 text-tier-bronze";
+    case "silver":   return "bg-gray-600 text-tier-silver";
+    case "gold":     return "bg-yellow-900 text-tier-gold";
+    case "prismatic": return "bg-purple-900 text-tier-prismatic";
+    default:          return "bg-gray-700 text-gray-400";
   }
 });
 </script>

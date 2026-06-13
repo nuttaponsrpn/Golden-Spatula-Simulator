@@ -1,11 +1,12 @@
 <template>
   <div
+    ref="badgeRef"
     :class="[
-      'flex items-center gap-1.5 rounded-full px-2 py-1 transition-all duration-200',
+      'flex items-center gap-1.5 rounded-full px-2 py-1 transition-all duration-200 cursor-pointer',
       isActive ? 'bg-gray-800 ring-1 ring-gray-600/60' : 'bg-gray-900/40 opacity-65',
     ]"
-    :title="`${activation.trait.name} (${activation.activeCount}/${nextThresholdCount})`"
     :data-testid="`synergy-badge-${activation.trait.id}`"
+    @click="onToggle"
   >
     <img
       v-if="activation.trait.imageUrl"
@@ -33,6 +34,12 @@
       {{ activation.activeCount }}/{{ nextThresholdCount }}
     </span>
   </div>
+
+  <SynergyTraitTooltip
+    :activation="activation"
+    :visible="isHovered"
+    :anchor-rect="anchorRect"
+  />
 </template>
 
 <script setup lang="ts">
@@ -41,6 +48,37 @@ import type { SynergyActivation } from "~/types/trait";
 const props = defineProps<{
   activation: SynergyActivation;
 }>();
+
+const badgeRef = ref<HTMLElement | null>(null);
+const isHovered = ref(false);
+const anchorRect = ref<DOMRect | null>(null);
+
+function onToggle(): void {
+  if (isHovered.value) {
+    isHovered.value = false;
+    return;
+  }
+  anchorRect.value = badgeRef.value?.getBoundingClientRect() ?? null;
+  isHovered.value = true;
+}
+
+function onOutsideClick(e: MouseEvent): void {
+  if (badgeRef.value && !badgeRef.value.contains(e.target as Node)) {
+    isHovered.value = false;
+  }
+}
+
+watch(isHovered, (open) => {
+  if (open) {
+    document.addEventListener("click", onOutsideClick, { capture: true });
+  } else {
+    document.removeEventListener("click", onOutsideClick, { capture: true });
+  }
+});
+
+onUnmounted(() => {
+  document.removeEventListener("click", onOutsideClick, { capture: true });
+});
 
 const isActive = computed(() => props.activation.activeTier !== null);
 
