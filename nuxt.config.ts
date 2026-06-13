@@ -1,6 +1,44 @@
 export default defineNuxtConfig({
   future: { compatibilityVersion: 4 },
-  modules: ['@nuxtjs/tailwindcss'],
+  modules: ['@nuxtjs/tailwindcss', '@vite-pwa/nuxt'],
+
+  pwa: {
+    registerType: 'autoUpdate',
+    manifest: {
+      name: 'Golden Spatula Simulator',
+      short_name: 'GS Sim',
+      description: 'TFT Set 14 Cyber City team composition builder with AI advisor',
+      theme_color: '#1a1a2e',
+      background_color: '#0d0d1a',
+      display: 'standalone',
+      orientation: 'portrait',
+      scope: '/',
+      start_url: '/',
+      icons: [
+        { src: '/icons/icon-72x72.png', sizes: '72x72', type: 'image/png' },
+        { src: '/icons/icon-96x96.png', sizes: '96x96', type: 'image/png' },
+        { src: '/icons/icon-128x128.png', sizes: '128x128', type: 'image/png' },
+        { src: '/icons/icon-144x144.png', sizes: '144x144', type: 'image/png' },
+        { src: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png' },
+        { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+        { src: '/icons/icon-384x384.png', sizes: '384x384', type: 'image/png' },
+        { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+      ],
+    },
+    workbox: {
+      navigateFallback: '/',
+      // No data caching — only precache the app shell
+      globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+      runtimeCaching: [],
+    },
+    client: {
+      installPrompt: true,
+    },
+    devOptions: {
+      enabled: true,
+      type: 'module',
+    },
+  },
   typescript: { strict: true, typeCheck: true },
   components: {
     dirs: [

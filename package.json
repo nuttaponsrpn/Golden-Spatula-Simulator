@@ -9,7 +9,8 @@
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
     "gen:api": "tsx scripts/gen-api.ts",
-    "gen:api:check": "tsx scripts/gen-api.ts --check"
+    "gen:api:check": "tsx scripts/gen-api.ts --check",
+    "gen:icons": "node scripts/gen-icons.mjs"
   },
   "dependencies": {
     "nuxt": "^4.4.6",
@@ -19,8 +20,10 @@
   "devDependencies": {
     "@nuxtjs/tailwindcss": "^6.14.0",
     "@types/node": "^25.9.3",
+    "@vite-pwa/nuxt": "^1.1.1",
     "openapi-typescript": "^7.13.0",
     "playwright": "^1.60.0",
+    "sharp": "^0.35.1",
     "tsx": "^4.22.4",
     "typescript": "^5.7.0",
     "vue-tsc": "^3.3.4"

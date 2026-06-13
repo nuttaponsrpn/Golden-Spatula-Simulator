@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background hex gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="100%" stop-color="#0d0d1a"/>
+    </radialGradient>
+
+    <!-- Gold spatula gradient -->
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe066"/>
+      <stop offset="40%" stop-color="#ffd700"/>
+      <stop offset="75%" stop-color="#c9960c"/>
+      <stop offset="100%" stop-color="#8b6914"/>
+    </linearGradient>
+
+    <!-- Gold shine -->
+    <linearGradient id="goldShine" x1="0%" y1="0%" x2="60%" y2="100%">
+      <stop offset="0%" stop-color="#fff8c0" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#ffd700" stop-opacity="0"/>
+    </linearGradient>
+
+    <!-- Hex border gradient (cyber purple-gold) -->
+    <linearGradient id="hexBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="50%" stop-color="#ffd700"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+
+    <!-- Glow filter -->
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feComposite in="blur" in2="SourceGraphic" operator="over"/>
+    </filter>
+
+    <!-- Strong glow for spatula -->
+    <filter id="goldGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feComposite in="blur" in2="SourceGraphic" operator="over"/>
+    </filter>
+
+    <!-- Subtle drop shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="6" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Hexagonal background shape -->
+  <polygon
+    points="256,16 472,136 472,376 256,496 40,376 40,136"
+    fill="url(#bgGrad)"
+    stroke="url(#hexBorder)"
+    stroke-width="6"
+  />
+
+  <!-- Inner hex ring (cyber grid lines) -->
+  <polygon
+    points="256,44 448,154 448,358 256,468 64,358 64,154"
+    fill="none"
+    stroke="#c084fc"
+    stroke-width="1"
+    stroke-opacity="0.2"
+  />
+  <polygon
+    points="256,72 424,172 424,340 256,440 88,340 88,172"
+    fill="none"
+    stroke="#c084fc"
+    stroke-width="1"
+    stroke-opacity="0.12"
+  />
+
+  <!-- Corner cyber accents -->
+  <line x1="256" y1="16" x2="256" y2="44" stroke="#c084fc" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="472" y1="136" x2="448" y2="154" stroke="#c084fc" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="472" y1="376" x2="448" y2="358" stroke="#c084fc" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="256" y1="496" x2="256" y2="468" stroke="#c084fc" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="40" y1="376" x2="64" y2="358" stroke="#c084fc" stroke-width="2" stroke-opacity="0.6"/>
+  <line x1="40" y1="136" x2="64" y2="154" stroke="#c084fc" stroke-width="2" stroke-opacity="0.6"/>
+
+  <!-- Spatula glow (behind) -->
+  <g filter="url(#goldGlow)" opacity="0.5">
+    <!-- Handle -->
+    <rect x="230" y="270" width="52" height="140" rx="10" fill="#ffd700"/>
+    <!-- Blade -->
+    <ellipse cx="256" cy="215" rx="60" ry="70" fill="#ffd700"/>
+  </g>
+
+  <!-- === GOLDEN SPATULA === -->
+  <g filter="url(#shadow)">
+    <!-- Handle -->
+    <rect x="230" y="270" width="52" height="145" rx="10" fill="url(#goldGrad)"/>
+    <!-- Handle grip lines -->
+    <rect x="230" y="295" width="52" height="6" rx="3" fill="#8b6914" opacity="0.5"/>
+    <rect x="230" y="308" width="52" height="6" rx="3" fill="#8b6914" opacity="0.5"/>
+    <rect x="230" y="321" width="52" height="6" rx="3" fill="#8b6914" opacity="0.5"/>
+    <!-- Handle shine -->
+    <rect x="233" y="273" width="18" height="139" rx="8" fill="url(#goldShine)" opacity="0.5"/>
+
+    <!-- Blade (spatula head) -->
+    <ellipse cx="256" cy="210" rx="68" ry="74" fill="url(#goldGrad)"/>
+    <!-- Blade holes (3 circles - spatula detail) -->
+    <circle cx="240" cy="198" r="10" fill="#0d0d1a" opacity="0.6"/>
+    <circle cx="272" cy="198" r="10" fill="#0d0d1a" opacity="0.6"/>
+    <circle cx="256" cy="222" r="10" fill="#0d0d1a" opacity="0.6"/>
+    <!-- Blade edge highlight -->
+    <ellipse cx="248" cy="194" rx="55" ry="60" fill="none" stroke="#ffe566" stroke-width="2.5" stroke-opacity="0.5"/>
+    <!-- Blade shine -->
+    <ellipse cx="234" cy="188" rx="28" ry="36" fill="url(#goldShine)" opacity="0.4"/>
+  </g>
+
+  <!-- TFT star sparkles around spatula -->
+  <!-- Star top-left -->
+  <g fill="#ffd700" opacity="0.9" filter="url(#glow)">
+    <polygon points="148,148 154,166 172,166 158,177 163,195 148,184 133,195 138,177 124,166 142,166" transform="scale(0.55) translate(120,120)"/>
+  </g>
+  <!-- Star top-right -->
+  <g fill="#c084fc" opacity="0.9" filter="url(#glow)">
+    <polygon points="364,148 370,166 388,166 374,177 379,195 364,184 349,195 354,177 340,166 358,166" transform="scale(0.55) translate(-120,120)"/>
+  </g>
+  <!-- Small star bottom-left -->
+  <g fill="#ffd700" opacity="0.7">
+    <polygon points="130,340 133,349 142,349 135,355 137,364 130,359 123,364 125,355 118,349 127,349" transform="scale(0.7) translate(56,-80)"/>
+  </g>
+  <!-- Small star bottom-right -->
+  <g fill="#c084fc" opacity="0.7">
+    <polygon points="382,340 385,349 394,349 387,355 389,364 382,359 375,364 377,355 370,349 379,349" transform="scale(0.7) translate(-56,-80)"/>
+  </g>
+
+  <!-- Bottom label area -->
+  <rect x="100" y="418" width="312" height="48" rx="8" fill="#000" fill-opacity="0.4"/>
+  <text
+    x="256" y="451"
+    font-family="'Arial Black', 'Impact', sans-serif"
+    font-size="22"
+    font-weight="900"
+    fill="#ffd700"
+    text-anchor="middle"
+    letter-spacing="2"
+  >GOLDEN SPATULA</text>
+</svg>
