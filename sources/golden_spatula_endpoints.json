@@ -1,0 +1,60 @@
+{
+    "game": "Golden Spatula",
+    "region_language": "EN",
+    "version_patch": "18.17.3-S18",
+    "data_sources": {
+        "core_game_data": {
+            "chess": {
+                "file_name": "chess.js",
+                "description": "Hero and champion data including stats, costs, traits, and skills.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/17/18.17.3-S18/chess.js"
+            },
+            "trait": {
+                "file_name": "trait.js",
+                "description": "Synergies, traits, and classes definitions and tier break-points.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/17/18.17.3-S18/trait.js"
+            },
+            "equip": {
+                "file_name": "equip.js",
+                "description": "Item definitions, recipe combinations, stats, and unique effects.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/17/18.17.3-S18/equip.js"
+            },
+            "hex": {
+                "file_name": "hex.js",
+                "description": "Augments data and special in-game Hextech enhancements.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/17/18.17.3-S18/hex.js"
+            },
+            "god": {
+                "file_name": "god.js",
+                "description": "Tacticians / Little Legends or special seasonal system configurations.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/17/18.17.3-S18/god.js"
+            }
+        },
+        "meta_and_lineups": {
+            "lineup_detail_total": {
+                "file_name": "lineup_detail_total.json",
+                "description": "Top tier recommended team compositions, positioning, items, and augments.",
+                "url": "https://goldenspatula.com/act/jkxzlkJson/json/EN/lineupJson/m18/29/17/lineup_detail_total.json"
+            },
+            "tag_grouped": {
+                "file_name": "tag_grouped.json",
+                "description": "Tag groups for classifications like S-Tier, AP, AD, or Reroll styles.",
+                "url": "https://goldenspatula.com/act/jkxzlkJson/json/tagJson/tag_grouped.json"
+            }
+        },
+        "system_and_config": {
+            "versiondataconfig": {
+                "file_name": "versiondataconfig.js",
+                "description": "Global version configuration mapping current active sets and patch branches.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/config/versiondataconfig.js"
+            }
+        },
+        "optional_data": {
+            "mission": {
+                "file_name": "mission.js",
+                "description": "In-game quests, events, and mission milestones configuration.",
+                "url": "https://goldenspatula.com/act/jkxzlkFile/js/EN/17/18.17.3-S18/mission.js"
+            }
+        }
+    }
+}
