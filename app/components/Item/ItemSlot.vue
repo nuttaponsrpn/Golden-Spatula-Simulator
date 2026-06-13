@@ -1,20 +1,18 @@
 <template>
   <div
-    class="relative w-[22px] h-[22px] rounded bg-black/20 border border-white/10 flex items-center justify-center cursor-pointer transition-all duration-200"
+    class="relative w-[22px] h-[22px] rounded bg-black/20 border border-white/10 flex items-center justify-center cursor-pointer transition-all duration-200 touch-target"
     :class="[
       isOver ? 'border-yellow-400/50 bg-yellow-400/10' : 'hover:border-white/30',
-      item ? 'group' : '',
     ]"
     @dragenter.prevent="onDragEnter"
     @dragleave.prevent="onDragLeave"
     @dragover.prevent
     @drop.prevent="onDrop"
+    @click="item && $emit('open-detail')"
   >
     <!-- Empty Slot -->
     <template v-if="!item">
-      <span class="text-white/10 text-[14px] font-bold transition-colors group-hover:text-white/20"
-        >+</span
-      >
+      <span class="text-white/10 text-[14px] font-bold">+</span>
     </template>
 
     <!-- Occupied Slot -->
@@ -31,14 +29,6 @@
         />
         <span v-else>{{ item.name.charAt(0) }}</span>
       </div>
-
-      <!-- Remove Button -->
-      <button
-        class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 shadow-sm"
-        @click.stop="$emit('remove')"
-      >
-        <span class="text-[7px] text-white leading-none">×</span>
-      </button>
     </template>
   </div>
 </template>
@@ -52,7 +42,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   drop: [item: Item];
-  remove: [];
+  "open-detail": [];
 }>();
 
 const isOver = ref(false);

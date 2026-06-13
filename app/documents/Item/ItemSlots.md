@@ -21,8 +21,9 @@
 ## Behavior
 
 - Renders three `<ItemSlot>` components in a horizontal row.
-- Maps each slot to its corresponding item in the `items` array.
-- Bubbles up events from child `ItemSlot` components with the appropriate index.
+- Owns the `ItemDetailModal` — manages `modalVisible`, `modalItem`, and `modalSlotIndex` state locally.
+- Clicking an occupied slot opens the modal; confirming remove emits `item-remove` with the correct index.
+- The `item-remove` emit is no longer forwarded from `ItemSlot` directly — it originates from the modal.
 
 ## Examples
 
