@@ -26,7 +26,14 @@
           />
         </div>
 
-        <div class="flex flex-col gap-1.5">
+        <div
+          v-if="draft.kind === 'gemini-default'"
+          class="rounded-lg border border-blue-800 bg-blue-950/40 px-3 py-2 text-xs text-blue-300"
+        >
+          ใช้ Gemini API key จาก environment ของโปรเจค (gemini-2.0-flash)
+        </div>
+
+        <div v-if="draft.kind !== 'gemini-default'" class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-gray-400">API Key</label>
           <ElementBaseInput
             v-model="draft.apiKey"
@@ -45,7 +52,7 @@
           />
         </div>
 
-        <div class="flex flex-col gap-1.5">
+        <div v-if="draft.kind !== 'gemini-default'" class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-gray-400">
             Model (ไม่บังคับ)
           </label>
@@ -58,7 +65,7 @@
         <div class="flex gap-2 pt-2">
           <ElementBaseButton
             variant="primary"
-            :disabled="!draft.apiKey.trim()"
+            :disabled="!canSave"
             @click="save"
           >
             บันทึก
@@ -83,7 +90,7 @@
 <script setup lang="ts">
 import type { AiProviderKind } from "~/types/ai-provider";
 
-const { config, setConfig, clearConfig } = useAiProvider();
+const { config, setConfig, clearConfig, hasDefaultGemini } = useAiProvider();
 
 const open = ref(false);
 
@@ -103,33 +110,45 @@ watch(open, (val) => {
   }
 });
 
-const providerOptions = [
+const providerOptions = computed(() => [
+  { value: "gemini-default", label: "Gemini — Default (Google)", disabled: !hasDefaultGemini.value },
   { value: "claude", label: "Claude (Anthropic)" },
   { value: "gemini", label: "Gemini (Google)" },
   { value: "copilot", label: "Copilot / OpenAI-compatible" },
-];
+]);
 
-const providerLabel = computed(() => {
-  const opt = providerOptions.find((o) => o.value === config.value?.kind);
-  return opt?.label ?? config.value?.kind ?? "";
-});
+const allProviderLabels: Record<AiProviderKind, string> = {
+  "gemini-default": "Gemini — Default",
+  claude: "Claude (Anthropic)",
+  gemini: "Gemini (Google)",
+  copilot: "Copilot / OpenAI-compatible",
+};
+
+const providerLabel = computed(() =>
+  config.value ? (allProviderLabels[config.value.kind] ?? config.value.kind) : "",
+);
 
 const defaultModelHint = computed(() => {
   switch (draft.kind) {
     case "claude":
-      return "claude-opus-4-5 (default)";
+      return "claude-opus-4-8 (default)";
     case "gemini":
+    case "gemini-default":
       return "gemini-2.0-flash (default)";
     case "copilot":
       return "gpt-4o (default)";
   }
 });
 
+const canSave = computed(() =>
+  draft.kind === "gemini-default" ? true : !!draft.apiKey.trim(),
+);
+
 function save(): void {
   setConfig({
     kind: draft.kind,
-    apiKey: draft.apiKey.trim(),
-    model: draft.model.trim() || undefined,
+    apiKey: draft.kind === "gemini-default" ? "" : draft.apiKey.trim(),
+    model: draft.kind === "gemini-default" ? undefined : (draft.model.trim() || undefined),
     baseUrl: draft.baseUrl.trim() || undefined,
   });
   open.value = false;

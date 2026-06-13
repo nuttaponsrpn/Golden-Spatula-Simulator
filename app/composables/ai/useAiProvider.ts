@@ -3,6 +3,7 @@ import type { AppError } from "~/types/app-error";
 import { normalizeError, validationError } from "~/utils/error";
 import { createClaudeProvider } from "./providers/claude";
 import { createGeminiProvider } from "./providers/gemini";
+import { createGeminiDefaultProvider } from "./providers/gemini-default";
 import { createCopilotProvider } from "./providers/copilot";
 
 const LOCAL_STORAGE_KEY = "tft-ai-provider-config";
@@ -13,6 +14,8 @@ function makeProvider(config: AiProviderConfig): AiProvider {
       return createClaudeProvider(config);
     case "gemini":
       return createGeminiProvider(config);
+    case "gemini-default":
+      return createGeminiDefaultProvider();
     case "copilot":
       return createCopilotProvider(config);
   }
@@ -74,5 +77,13 @@ export function useAiProvider() {
     }
   }
 
-  return { config, setConfig, clearConfig, activeProvider, sendMessage };
+  const { data: geminiStatus } = useAsyncData(
+    "gemini-default-status",
+    () => $fetch<{ available: boolean }>("/api/ai/gemini-status"),
+    { server: false, default: () => ({ available: false }) },
+  );
+
+  const hasDefaultGemini = computed(() => geminiStatus.value?.available ?? false);
+
+  return { config, setConfig, clearConfig, activeProvider, sendMessage, hasDefaultGemini };
 }
