@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   },
   css: ['~/assets/css/tft.css'],
   runtimeConfig: {
+    geminiApiKey: '',
     public: {
       apiBase: '',
     },
