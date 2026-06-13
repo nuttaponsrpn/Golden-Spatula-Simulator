@@ -11,10 +11,10 @@
       >
         <div class="absolute inset-0 bg-black/70" />
         <div
-          class="relative w-full max-w-lg rounded-xl bg-gray-900 shadow-2xl"
+          class="relative flex max-h-[90dvh] w-full max-w-lg flex-col rounded-xl bg-gray-900 shadow-2xl"
           data-testid="modal-content"
         >
-          <div class="flex items-center justify-between border-b border-gray-800 px-5 py-4">
+          <div class="flex shrink-0 items-center justify-between border-b border-gray-800 px-5 py-4">
             <h2 class="text-base font-semibold text-gray-100">{{ title }}</h2>
             <button
               class="flex h-7 w-7 items-center justify-center rounded text-gray-400 hover:bg-gray-700 hover:text-gray-100 transition-colors"
@@ -24,7 +24,7 @@
               &times;
             </button>
           </div>
-          <div class="p-5">
+          <div class="overflow-y-auto p-5">
             <slot />
           </div>
         </div>
