@@ -2,7 +2,7 @@
   <ElementBaseModal :visible="true" title="เลือก Champion ตั้งต้น" @close="$emit('skip')">
     <div class="flex flex-col gap-4 p-4">
       <p class="text-sm text-gray-400">
-        เลือก champion ที่ต้องการล็อกไว้ในทีม AI จะจัดทีมโดยมี champion เหล่านี้อยู่เสมอ
+        เลือก champion ที่ต้องการล็อกไว้ในทีม (ไม่บังคับ) — AI จะจัดทีมโดยมี champion เหล่านี้อยู่เสมอ
         <span v-if="selected.size > 0" class="text-white font-medium">({{ selected.size }} ตัว)</span>
       </p>
 
@@ -16,11 +16,10 @@
           v-for="champion in filteredChampions"
           :key="champion.id"
           :class="[
-            'relative flex flex-col items-center gap-1 rounded-lg border p-2 transition-all',
-            selected.has(champion.id)
-              ? 'border-cost-5 bg-gray-700'
-              : 'border-gray-700 bg-gray-800 hover:border-gray-600',
+            'relative flex flex-col items-center gap-1 rounded-lg border-2 p-2 transition-all',
+            selected.has(champion.id) ? 'bg-gray-700' : 'bg-gray-800',
           ]"
+          :style="{ borderColor: `var(--cost-${champion.cost})` }"
           @click="toggle(champion.id)"
         >
           <img

@@ -30,7 +30,7 @@
           v-if="draft.kind === 'gemini-default'"
           class="rounded-lg border border-blue-800 bg-blue-950/40 px-3 py-2 text-xs text-blue-300"
         >
-          ใช้ Gemini API key จาก environment ของโปรเจค (gemini-2.0-flash)
+          ใช้ Gemini API key จาก environment ของโปรเจค (gemini-2.5-pro)
         </div>
 
         <div v-if="draft.kind !== 'gemini-default'" class="flex flex-col gap-1.5">
@@ -94,8 +94,12 @@ const { config, setConfig, clearConfig, hasDefaultGemini } = useAiProvider();
 
 const open = ref(false);
 
+const defaultKind = computed<AiProviderKind>(() =>
+  config.value?.kind ?? (hasDefaultGemini.value ? "gemini-default" : "claude"),
+);
+
 const draft = reactive({
-  kind: (config.value?.kind ?? "claude") as AiProviderKind,
+  kind: defaultKind.value,
   apiKey: config.value?.apiKey ?? "",
   model: config.value?.model ?? "",
   baseUrl: config.value?.baseUrl ?? "",
@@ -103,7 +107,7 @@ const draft = reactive({
 
 watch(open, (val) => {
   if (val) {
-    draft.kind = config.value?.kind ?? "claude";
+    draft.kind = defaultKind.value;
     draft.apiKey = config.value?.apiKey ?? "";
     draft.model = config.value?.model ?? "";
     draft.baseUrl = config.value?.baseUrl ?? "";
@@ -134,7 +138,7 @@ const defaultModelHint = computed(() => {
       return "claude-opus-4-8 (default)";
     case "gemini":
     case "gemini-default":
-      return "gemini-2.0-flash (default)";
+      return "gemini-2.5-pro (default)";
     case "copilot":
       return "gpt-4o (default)";
   }

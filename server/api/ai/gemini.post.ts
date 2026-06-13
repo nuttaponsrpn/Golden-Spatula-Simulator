@@ -15,7 +15,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody<GeminiRequestBody>(event);
-  const model = body.model ?? "gemini-2.0-flash";
+  const model = body.model ?? "gemini-2.5-pro";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
   const upstream = await fetch(url, {
