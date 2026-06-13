@@ -9,7 +9,7 @@
         'min-h-[44px] max-h-40',
         disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-gray-600 focus:border-gray-500',
       ]"
-      placeholder="พิมพ์ข้อความ... (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
+      :placeholder="placeholder"
       rows="1"
       data-testid="chat-composer"
       @keydown="onKeydown"
@@ -43,6 +43,16 @@ const emit = defineEmits<{
 }>();
 
 const text = ref("");
+
+const isMobile = ref(false);
+onMounted(() => {
+  const mq = window.matchMedia("(max-width: 639px)");
+  isMobile.value = mq.matches;
+  mq.addEventListener("change", (e) => { isMobile.value = e.matches; });
+});
+const placeholder = computed(() =>
+  isMobile.value ? "พิมพ์ข้อความ..." : "พิมพ์ข้อความ... (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"
+);
 const textareaRef = ref<HTMLTextAreaElement | null>(null);
 
 function autoResize(): void {
