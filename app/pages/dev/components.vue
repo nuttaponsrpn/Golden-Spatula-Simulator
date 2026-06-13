@@ -112,20 +112,78 @@
                 </div>
               </div>
 
-              <!-- Details -->
+              <!-- Details / Editor -->
               <div class="w-full xl:w-[400px] flex flex-col gap-4">
+                <!-- Interactive Prop Editor -->
                 <div class="flex-1 bg-black rounded-xl border border-gray-800 overflow-hidden flex flex-col">
-                  <div class="px-4 py-2 bg-gray-900 border-b border-gray-800">
-                    <span class="text-[10px] font-bold uppercase text-gray-500 tracking-widest">Current Props (Reactive)</span>
+                  <div class="px-4 py-2 bg-gray-900 border-b border-gray-800 flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase text-gray-500 tracking-widest">Prop Editor</span>
+                    <span class="text-[10px] text-gray-600 font-mono">Real-time</span>
                   </div>
-                  <pre class="flex-1 p-4 text-xs text-blue-300 font-mono overflow-auto">{{ JSON.stringify(exampleStates[index], null, 2) }}</pre>
+                  
+                  <div class="flex-1 p-4 overflow-y-auto space-y-4 custom-scrollbar">
+                    <div v-for="(val, key) in exampleStates[index]" :key="key" class="space-y-1">
+                      <div class="flex items-center justify-between">
+                        <label :for="`prop-${index}-${key}`" class="text-xs font-mono text-gray-400">{{ key }}</label>
+                        <span class="text-[9px] text-gray-600 font-mono italic">{{ typeof val === 'object' ? (Array.isArray(val) ? 'array' : 'object') : typeof val }}</span>
+                      </div>
+
+                      <!-- Boolean Editor -->
+                      <div v-if="typeof val === 'boolean'" class="flex items-center">
+                        <button 
+                          @click="exampleStates[index][key] = !val"
+                          class="relative inline-flex h-5 w-10 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-black"
+                          :class="val ? 'bg-blue-600' : 'bg-gray-700'"
+                        >
+                          <span 
+                            class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform" 
+                            :class="val ? 'translate-x-5.5' : 'translate-x-1'"
+                          />
+                        </button>
+                        <span class="ml-2 text-xs text-gray-300">{{ val }}</span>
+                      </div>
+
+                      <!-- Number Editor -->
+                      <input 
+                        v-else-if="typeof val === 'number'"
+                        :id="`prop-${index}-${key}`"
+                        type="number" 
+                        v-model.number="exampleStates[index][key]"
+                        class="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-blue-300 focus:outline-none focus:border-blue-500 transition-colors"
+                      />
+
+                      <!-- Object/Array Editor -->
+                      <textarea
+                        v-else-if="typeof val === 'object' && val !== null"
+                        :id="`prop-${index}-${key}`"
+                        :value="JSON.stringify(val, null, 2)"
+                        @input="(e) => updateJsonObject(index, key, (e.target as HTMLTextAreaElement).value)"
+                        rows="4"
+                        class="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-yellow-500 font-mono focus:outline-none focus:border-yellow-500 transition-colors resize-none"
+                      ></textarea>
+
+                      <!-- Function (Read only) -->
+                      <div v-else-if="typeof val === 'function'" class="p-2 bg-gray-900/50 rounded border border-gray-800/50 text-[10px] text-gray-600 italic font-mono">
+                        (function) => [Native Code]
+                      </div>
+
+                      <!-- Default/String Editor -->
+                      <input 
+                        v-else
+                        :id="`prop-${index}-${key}`"
+                        type="text" 
+                        v-model="exampleStates[index][key]"
+                        class="w-full bg-gray-900 border border-gray-800 rounded px-2 py-1.5 text-xs text-green-400 focus:outline-none focus:border-green-500 transition-colors"
+                      />
+                    </div>
+                  </div>
                 </div>
                 
-                <div class="flex-1 bg-black rounded-xl border border-gray-800 overflow-hidden flex flex-col">
+                <div class="h-48 bg-black rounded-xl border border-gray-800 overflow-hidden flex flex-col">
                   <div class="px-4 py-2 bg-gray-900 border-b border-gray-800">
                     <span class="text-[10px] font-bold uppercase text-gray-500 tracking-widest">Original Usage</span>
                   </div>
-                  <pre class="flex-1 p-4 text-xs text-green-300 font-mono overflow-auto">{{ example.usage }}</pre>
+                  <pre class="flex-1 p-4 text-xs text-gray-500 font-mono overflow-auto opacity-50">{{ example.usage }}</pre>
                 </div>
               </div>
             </div>
@@ -204,6 +262,14 @@ function handleEvent(index: number, event: string, payload?: any) {
   }
 }
 
+function updateJsonObject(index: number, key: string | number, value: string) {
+  try {
+    exampleStates[index][key] = JSON.parse(value);
+  } catch (e) {
+    // Silently wait for valid JSON
+  }
+}
+
 function getComponentName(componentPath: string) {
   const normalizedPath = componentPath.replace(/\\/g, '/');
   const path = normalizedPath.replace('app/components/', '').replace('.vue', '');
@@ -216,5 +282,22 @@ function getComponentName(componentPath: string) {
 body {
   margin: 0;
   padding: 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #444;
 }
 </style>
