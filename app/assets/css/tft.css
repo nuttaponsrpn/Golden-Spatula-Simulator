@@ -1,0 +1,74 @@
+:root {
+  --hex-size: 48px;
+  --hex-gap: 12px;
+  --cost-1: #9e9e9e;
+  --cost-2: #4caf50;
+  --cost-3: #2196f3;
+  --cost-4: #9c27b0;
+  --cost-5: #ffc107;
+  --tier-bronze: #cd7f32;
+  --tier-silver: #c0c0c0;
+  --tier-gold: #ffd700;
+  --tier-prismatic: #b388ff;
+}
+
+/* ── Drag cursor override — applied to body via useDragDrop ── */
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing !important;
+}
+
+/* ── Custom Scrollbar ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #374151 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #374151;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #4b5563;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.hex-cell {
+  width: 38px;
+  height: 41px;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  transition: filter 0.15s ease;
+}
+
+.hex-cell:hover {
+  filter: brightness(1.15);
+}
+
+/* Offset hex grid: odd rows shift right */
+.hex-row-odd {
+  margin-left: calc(64px / 2 + 12px);
+}
+
+/* Prevent child elements from interrupting drag events on the cell */
+.hex-cell > * {
+  pointer-events: none;
+}
+
+/* Restore for interactive and draggable elements */
+.hex-cell button,
+.hex-cell [draggable="true"] {
+  pointer-events: auto;
+}
