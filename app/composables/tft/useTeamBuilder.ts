@@ -161,6 +161,11 @@ export function useTeamBuilder() {
     return teamUnits.value.some((u) => u.championId === championId);
   }
 
+  function loadUnits(units: PlacedUnits): void {
+    clearBoard();
+    teamUnits.value = [...units].slice(0, MAX_UNITS);
+  }
+
   function loadComp(comp: SuggestedComp, champions: Champion[]): void {
     clearBoard();
 
@@ -206,5 +211,6 @@ export function useTeamBuilder() {
     clearBoard,
     isChampionOnBoard,
     loadComp,
+    loadUnits,
   };
 }

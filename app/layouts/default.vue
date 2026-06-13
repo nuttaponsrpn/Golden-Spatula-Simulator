@@ -13,6 +13,9 @@
           <NuxtLink to="/comps" class="hover:text-gray-100 transition-colors" active-class="text-gray-100">
             Comps
           </NuxtLink>
+          <NuxtLink to="/chat" class="hover:text-gray-100 transition-colors" active-class="text-gray-100">
+            Chat
+          </NuxtLink>
         </div>
       </div>
     </nav>
