@@ -68,6 +68,13 @@ body.is-dragging * {
   margin-left: calc(64px / 2 + 12px);
 }
 
+/* Expand touch hit area for small item slots without affecting visual size */
+.touch-target::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+}
+
 /* Prevent child elements from interrupting drag events on the cell */
 .hex-cell > * {
   pointer-events: none;

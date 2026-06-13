@@ -5,7 +5,8 @@ import type { Item } from "~/types/item";
 const DRAG_DATA_KEY = "application/tft-drag";
 
 export function useDragDrop() {
-  const { addUnit, moveUnit, swapUnits, board } = useTeamBuilder();
+  const { addUnit, moveUnit, swapUnits, board, addItemToUnit } = useTeamBuilder();
+  const { items: allItems } = useItems();
   const dragOverPosition = useState<BoardPosition | null>(
     "tft-drag-over-position",
     () => null,
@@ -157,6 +158,18 @@ export function useDragDrop() {
       if (payload.championId) {
         addUnit(payload.championId, targetPosition);
       }
+    } else if (payload.kind === "item-picker") {
+      // Touch polyfill dispatches drop on the HexCell container when the finger
+      // lands near (but not exactly on) the small ItemSlot target. Find the first
+      // empty item slot on the occupied unit at this position and fill it.
+      if (!payload.itemId) return;
+      const targetRow = board.value[targetPosition.row];
+      const targetCell = targetRow?.[targetPosition.col];
+      if (targetCell?.status !== "occupied") return;
+      const slotIndex = targetCell.unit.items.findIndex((s) => s === null) as -1 | 0 | 1 | 2;
+      if (slotIndex === -1) return;
+      const item = allItems.value.find((i) => i.id === payload.itemId);
+      if (item) addItemToUnit(targetCell.unit.id, slotIndex, item);
     } else {
       if (!payload.unitId) return;
       // Check if target cell is occupied — if so, swap instead of move
