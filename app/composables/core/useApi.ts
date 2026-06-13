@@ -10,13 +10,13 @@ export const useApi = () => {
     options: any = {}
   ): Promise<{ status: "success"; data: T } | { status: "error"; error: any }> => {
     try {
-      const data = await $fetch<T>(path, {
+      const data = (await $fetch<T>(path, {
         baseURL,
         ...options,
         async onResponseError({ response }) {
           throw new ApiException(response.status, response._data)
         },
-      })
+      })) as T
       return { status: "success", data }
     } catch (e) {
       return { status: "error", error: normalizeError(e) }

@@ -1,55 +1,80 @@
-# Web Template
+# Golden Spatula Simulator
 
-A "Gold Standard" Nuxt 4 starter template extracted from MyInterface. Designed for type safety, robust error handling, and scalable feature-based architecture.
+เว็บแอปสำหรับ Simulate ทีม Teamfight Tactics (TFT) Set 14 "Cyber City" — วางแชมป์บนบอร์ด เห็น Synergy แบบ real-time และรับคำแนะนำจาก Rule-based AI Advisor ว่าทีมดีไหม ควรเพิ่มหรือเปลี่ยนอะไร
 
 ## Tech Stack
 
-- **Framework**: [Nuxt 4](https://nuxt.com/) (SSR by default)
-- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **Framework**: [Nuxt 4](https://nuxt.com/) (SSR)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/) + custom TFT CSS variables
 - **Language**: TypeScript (Strict Mode)
-- **API**: OpenAPI with auto-generated types (`openapi-typescript`)
-- **Testing**: Playwright (Behavior-driven)
+- **State**: `useState()` only (no Pinia)
+- **Testing**: Playwright (Behavior-driven, `data-testid` pattern)
+- **AI Advisor**: Rule-based scoring engine (`app/utils/tft.ts`) — designed to be extensible to Claude API
 
-## Key Features
+## Prerequisites
 
-- **Standardized Error Handling**: Multi-layered system (`AppError`) that normalizes all errors and provides global state for notifications.
-- **Type-Safe API Client**: Base `useApi` composable that integrates with the error system and auto-generated types.
-- **Pure vs. Smart Components**: Strict architectural separation for better testability and reuse.
-- **Component Documentation**: Automatic documentation pattern in `app/documents/` with a built-in explorer at `/dev/components`.
-- **Universal AI Conventions**: Unified rules for Claude, Gemini, Copilot, and Cursor.
+- Node.js 20+
+- pnpm 9+
 
 ## Setup
 
-1. **Clone/Copy** this template to your new project folder.
-2. **Install dependencies**:
+1. Clone the repo
+2. Install dependencies:
    ```bash
    pnpm install
    ```
-3. **Configure API**:
-   - Copy `.env.example` to `.env` (create it if missing).
-   - Set `NUXT_PUBLIC_API_BASE` to your backend URL.
-   - Update `api-sources.config.ts` if needed.
-4. **Generate API Types**:
-   ```bash
-   pnpm gen:api
-   ```
-5. **Start Development**:
-   ```bash
-   pnpm dev
-   ```
 
-## Project Structure & AI Conventions
+## Development
 
-This project uses a "Single Source of Truth" for AI conventions to ensure all agents (Claude, Gemini, Copilot, Cursor) follow the same rules.
+- `pnpm dev` — start dev server at http://localhost:3000
+- `npx nuxi typecheck` — run type checking
+- `pnpm build` — production build
 
-- **CONVENTIONS.md**: The master file for all project rules and conventions.
-- **GEMINI.md / CLAUDE.md / .cursorrules**: Platform-specific entry points (identical copies of CONVENTIONS.md).
-- **.github/copilot-instructions.md**: Instructions specifically for GitHub Copilot.
+## Scripts
 
-**Note**: When updating project rules, always update **CONVENTIONS.md** and then sync the other files.
+- `pnpm dev` — start Nuxt dev server
+- `pnpm build` — build for production
+- `pnpm generate` — static site generation
+- `pnpm preview` — preview production build
+
+## Features
+
+- **Champion Picker** — browse ~30+ Set 14 champions, filter by name or trait
+- **Hex Board** — 4×7 hex grid; click champion to add/remove, max 9 units
+- **Synergy Panel** — real-time trait activation with threshold progress
+- **AI Advisor** — rule-based comp scoring (Trait Synergy 35%, Carry 25%, Frontline 20%, Cost 10%, Slots 10%) + improvement suggestions in Thai
+- **Comp Browser** (`/comps`) — 9 pre-built meta compositions with one-click "Load" to board
+
+## Project Structure
+
+```
+app/
+  assets/css/tft.css         ← TFT cost/tier CSS variables, hex-grid styles
+  components/
+    Advisor/                 ← ScoreDisplay, BreakdownPanel, SuggestionList
+    Board/                   ← HexGrid, HexCell, UnitToken
+    Champion/                ← Card, CostBadge, TraitBadge, Picker, DetailModal
+    CompBrowser/             ← CompCard, TraitSummary
+    Element/                 ← BaseButton, BaseModal, BaseInput, BaseTag
+    Synergy/                 ← Panel, TraitRow, ThresholdPips
+  composables/tft/           ← useChampions, useSynergies, useTeamBuilder, useCompAnalyzer, useSuggestedComps
+  data/                      ← champions.ts, traits.ts, suggestedComps.ts (hardcoded Set 14 data)
+  documents/                 ← component .md documentation
+  layouts/default.vue        ← global nav + error banner
+  pages/
+    index.vue                ← main simulator
+    comps.vue                ← comp browser
+  types/                     ← champion.ts, trait.ts, team.ts, comp.ts
+  utils/tft.ts               ← pure scoring math (no Vue dependency)
+```
+
+See `CLAUDE.md` for full conventions and AI agent rules.
 
 ## Documentation
 
-- `app/documents/`: All component documentation.
-- `/dev/components`: Live component preview (development mode only).
+- `CLAUDE.md` — conventions and rules for AI agents and developers
+- `app/documents/` — component documentation (one `.md` per component)
 
+## Deployment
+
+Static-compatible — `pnpm generate` outputs to `.output/public`. Deploy to Vercel, Netlify, Cloudflare Pages, or Azure Static Web Apps.
