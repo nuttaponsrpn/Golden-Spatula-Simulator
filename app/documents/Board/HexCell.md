@@ -10,7 +10,10 @@
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `cell` | `BoardCell` | ✅ | — | discriminated union: empty หรือ occupied |
-| `isDragOver` | `boolean` | — | `false` | แสดง highlight เมื่อมีการลาก unit มาวางทับ |
+| `isDragOver` | `boolean` | — | `false` | แสดง indigo highlight เมื่อมีการลาก unit มาวางทับ |
+| `isDraggingBoardUnit` | `boolean` | — | `false` | เปิด swap icon overlay บน occupied cells |
+| `isDragSource` | `boolean` | — | `false` | cell นี้คือต้นทางของ drag — ซ่อน swap icon |
+| `isDraggingChampion` | `boolean` | — | `false` | เปิด subtle white fill บน empty cells ขณะ drag |
 
 ## Emits
 
@@ -32,6 +35,7 @@
 - Clip-path hex shape จาก `.hex-cell` class
 - `data-testid="hex-cell-{row}-{col}"`
 - แสดง indigo ring highlight เมื่อ `isDragOver` เป็น true
+- **Drop zone:** ครอบคลุม container ทั้งหมด (74px กว้าง รวม item slots ด้านล่าง) — drag events อยู่ที่ root container div ไม่ใช่ hexagon ด้านในเท่านั้น
 
 ## Examples
 

@@ -1,5 +1,11 @@
 <template>
-  <div class="relative flex flex-col items-center pb-[24px] w-[74px]">
+  <div
+    class="relative flex flex-col items-center pb-[24px] w-[74px]"
+    @dragenter.prevent="$emit('drag-enter', cell.position)"
+    @dragover.prevent="$emit('drag-over', cell.position, $event)"
+    @dragleave="$emit('drag-leave', cell.position, $event)"
+    @drop.prevent="$emit('drop', cell.position, $event)"
+  >
     <!-- Cost border: outer hex rendered behind the cell -->
     <div
       v-if="cell.status === 'occupied'"
@@ -20,10 +26,6 @@
       "
       :data-testid="`hex-cell-${cell.position.row}-${cell.position.col}`"
       @click="$emit('click', cell.position)"
-      @dragenter="$emit('drag-enter', cell.position)"
-      @dragover.prevent="$emit('drag-over', cell.position, $event)"
-      @dragleave="$emit('drag-leave', cell.position, $event)"
-      @drop.prevent="$emit('drop', cell.position, $event)"
     >
       <BoardUnitToken
         v-if="cell.status === 'occupied'"
