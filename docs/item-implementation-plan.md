@@ -1,254 +1,248 @@
-# Item Implementation Plan
+# Dev Component Explorer Implementation Plan
 
-> Each occupied hexagon cell on the board will display 3 item slots below the champion portrait. Items can be dragged from an item picker and dropped into any available slot.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Implement a Dev Component Explorer at `/dev/components` that reads component documentation and provides a live preview.
+
+**Architecture:** A server API scans the `app/documents/` directory for `.md` files, parses them for component metadata and examples, and a frontend page displays this list and allows interactive preview of components using their auto-imported names.
+
+**Tech Stack:** Nuxt 4, Vue 3, Tailwind CSS, Node.js `fs`.
 
 ---
 
-## Overview
+### Task 1: Server API for Component Metadata
 
-Items are equipment that players assign to champions. Each champion can hold up to **3 items**. Items are sourced from an item picker panel and placed onto champion slots via drag-and-drop.
+**Files:**
+- Create: `server/api/dev/components.get.ts`
+- Create: `server/utils/markdown.ts`
 
----
-
-## Step 1 — Types (`app/types/item.ts`)
-
-Create a new type file for items.
+- [ ] **Step 1: Create markdown parsing utility**
+Create a utility to parse the project's component documentation format.
 
 ```ts
-// app/types/item.ts
-
-export interface Item {
-  id: string;
+// server/utils/markdown.ts
+export interface ComponentExample {
   name: string;
+  props: Record<string, any>;
+  usage: string;
+}
+
+export interface ComponentMetadata {
+  name: string;
+  path: string;
   description: string;
-  image?: string;
-  components?: [string, string]; // IDs of the two component items that combine into this
+  type: 'Pure' | 'Smart';
+  componentPath: string;
+  examples: ComponentExample[];
 }
 
-export type ItemSlot = Item | null;
-export type UnitItems = [ItemSlot, ItemSlot, ItemSlot]; // fixed 3-slot tuple
-```
+export function parseComponentMarkdown(content: string, filePath: string): ComponentMetadata {
+  const lines = content.split('\n');
+  const name = lines[0]?.replace('# ', '').trim() ?? '';
+  
+  const descriptionMatch = content.match(/> (.*)/);
+  const description = descriptionMatch ? descriptionMatch[1] : '';
+  
+  const typeMatch = content.match(/\*\*Type:\*\* (Pure|Smart)/);
+  const type = (typeMatch ? typeMatch[1] : 'Pure') as 'Pure' | 'Smart';
+  
+  const componentPathMatch = content.match(/\*\*Component:\*\* `(.*)`/);
+  const componentPath = componentPathMatch ? componentPathMatch[1] : '';
 
-### Update `app/types/team.ts`
+  const examples: ComponentExample[] = [];
+  const exampleSections = content.split('## Examples')[1]?.split('### ') ?? [];
+  
+  for (const section of exampleSections) {
+    if (!section.trim()) continue;
+    const lines = section.split('\n');
+    const exampleName = lines[0].trim();
+    
+    const jsonMatch = section.match(/```json\n([\s\S]*?)\n```/);
+    const vueMatch = section.match(/```vue\n([\s\S]*?)\n```/);
+    
+    if (jsonMatch) {
+      try {
+        examples.push({
+          name: exampleName,
+          props: JSON.parse(jsonMatch[1]),
+          usage: vueMatch ? vueMatch[1].trim() : ''
+        });
+      } catch (e) {
+        console.error(`Failed to parse JSON in ${filePath}: ${e}`);
+      }
+    }
+  }
 
-Add `items` to `TeamUnit`:
-
-```ts
-export interface TeamUnit {
-  id: string;
-  championId: string;
-  position: BoardPosition;
-  items: UnitItems; // add this field
-}
-```
-
----
-
-## Step 2 — Data (`app/data/items.ts`)
-
-Populate a list of TFT Set 14 items. Each entry maps to the `Item` interface.
-
-Examples:
-- Component items: B.F. Sword, Chain Vest, Needlessly Large Rod, Tear of the Goddess, Giant's Belt, Recurve Bow, Sparring Gloves, Negatron Cloak
-- Combined items: Infinity Edge, Warmog's Armor, Rabadon's Deathcap, etc.
-
-```ts
-// app/data/items.ts
-import type { Item } from '~/types/item';
-
-export const items: Item[] = [
-  {
-    id: 'bf-sword',
-    name: "B.F. Sword",
-    description: "+10 Attack Damage",
-  },
-  // ... more items
-];
-```
-
----
-
-## Step 3 — Drag Type (`app/types/drag.ts`)
-
-Extend `DragSourceKind` to include item dragging:
-
-```ts
-export type DragSourceKind = "picker" | "board" | "item-picker";
-
-export interface DragPayload {
-  kind: DragSourceKind;
-  championId?: string;
-  unitId?: string;
-  itemId?: string; // add this field
-}
-```
-
----
-
-## Step 4 — New Components
-
-### `app/components/Item/ItemSlot.vue` (Pure)
-
-Renders a single item slot.
-
-- **Props:** `item: ItemSlot`
-- **Emits:** `drop(item: Item)`, `remove()`
-- **Behavior:**
-  - Empty slot: shows a `+` placeholder, accepts drag-over highlight
-  - Occupied slot: shows the item image (or name initial as fallback)
-  - Shows a remove button on hover when occupied
-
-**Documents:** `app/documents/Item/ItemSlot.md`
-
----
-
-### `app/components/Item/ItemSlots.vue` (Pure)
-
-Renders the row of 3 item slots beneath a champion.
-
-- **Props:** `items: UnitItems`
-- **Emits:** `item-drop(slotIndex: 0 | 1 | 2, item: Item)`, `item-remove(slotIndex: 0 | 1 | 2)`
-- **Behavior:**
-  - Renders three `<ItemItemSlot>` in a horizontal row
-  - Passes slot data down and bubbles events up
-
-**Documents:** `app/documents/Item/ItemSlots.md`
-
----
-
-### `app/components/Item/Picker.vue` (Smart)
-
-Panel listing all available items.
-
-- **Behavior:**
-  - Reads from `app/data/items.ts`
-  - Each item card is draggable (`DragSourceKind = "item-picker"`)
-  - Emits `item-drag-start(item: Item)`
-
-**Documents:** `app/documents/Item/Picker.md`
-
----
-
-## Step 5 — Modify Existing Components
-
-### `app/components/Board/UnitToken.vue`
-
-Add `ItemSlots` below the champion portrait.
-
-- Add prop: `items: UnitItems`
-- Render `<ItemItemSlots>` at the bottom of the token
-- Bubble up `item-drop` and `item-remove` emits
-
-### `app/components/Board/HexCell.vue`
-
-Pass `unit.items` down into `UnitToken`.
-
-- Add prop forwarding: `items` → `UnitToken`
-- Bubble up `item-drop(unitId, slotIndex, item)` and `item-remove(unitId, slotIndex)` to `HexGrid`
-
-### `app/components/Board/HexGrid.vue`
-
-Wire item events into `useTeamBuilder`.
-
-- Handle `item-drop` → call `addItemToUnit(unitId, slotIndex, item)`
-- Handle `item-remove` → call `removeItemFromUnit(unitId, slotIndex)`
-
----
-
-## Step 6 — Update `useTeamBuilder.ts`
-
-Add item management methods and initialize `items` on `addUnit`.
-
-```ts
-// Initialize items when adding a unit
-const addUnit = (championId: string, position?: BoardPosition) => {
-  const unit: TeamUnit = {
-    id: generateId(),
-    championId,
-    position: resolvedPosition,
-    items: [null, null, null], // initialize empty
+  return {
+    name,
+    path: filePath,
+    description,
+    type,
+    componentPath,
+    examples
   };
-  // ...
-};
-
-const addItemToUnit = (unitId: string, slotIndex: 0 | 1 | 2, item: Item): void => {
-  // find unit → set items[slotIndex] = item
-};
-
-const removeItemFromUnit = (unitId: string, slotIndex: 0 | 1 | 2): void => {
-  // find unit → set items[slotIndex] = null
-};
+}
 ```
 
----
-
-## Step 7 — Update `useDragDrop.ts`
-
-Add drag handlers for items.
+- [ ] **Step 2: Create the server API route**
+Implement the API that scans `app/documents/` and returns the metadata.
 
 ```ts
-const onItemDragStart = (event: DragEvent, item: Item): void => {
-  const payload: DragPayload = { kind: "item-picker", itemId: item.id };
-  event.dataTransfer?.setData("application/tft-drag", JSON.stringify(payload));
-};
+// server/api/dev/components.get.ts
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { defineEventHandler } from 'h3';
 
-const onItemSlotDrop = (event: DragEvent, unitId: string, slotIndex: 0 | 1 | 2): void => {
-  const raw = event.dataTransfer?.getData("application/tft-drag");
-  if (!raw) return;
-  const payload: DragPayload = JSON.parse(raw);
-  if (payload.kind !== "item-picker" || !payload.itemId) return;
-  const item = getItemById(payload.itemId);
-  if (item) addItemToUnit(unitId, slotIndex, item);
-};
+export default defineEventHandler(async (event) => {
+  if (!import.meta.dev) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Dev only',
+    });
+  }
+
+  const docsDir = path.join(process.cwd(), 'app/documents');
+  const components: any[] = [];
+
+  async function walk(dir: string) {
+    const files = await fs.readdir(dir, { withFileTypes: true });
+    for (const file of files) {
+      const res = path.resolve(dir, file.name);
+      if (file.isDirectory()) {
+        await walk(res);
+      } else if (file.name.endsWith('.md')) {
+        const content = await fs.readFile(res, 'utf-8');
+        const relativePath = path.relative(docsDir, res);
+        components.push(parseComponentMarkdown(content, relativePath));
+      }
+    }
+  }
+
+  await walk(docsDir);
+  return components;
+});
+```
+
+- [ ] **Step 3: Test API**
+Run the dev server and check `http://localhost:3000/api/dev/components`.
+Expected: A JSON array of component metadata.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/api/dev/components.get.ts server/utils/markdown.ts
+git commit -m "dev: add server API for component metadata"
 ```
 
 ---
 
-## Step 8 — Documentation Files
+### Task 2: Dev Component Explorer Page
 
-Create paired `.md` files in `app/documents/` for every new component:
+**Files:**
+- Create: `app/pages/dev/components.vue`
 
-| Component | Document |
-| --- | --- |
-| `app/components/Item/ItemSlot.vue` | `app/documents/Item/ItemSlot.md` |
-| `app/components/Item/ItemSlots.vue` | `app/documents/Item/ItemSlots.md` |
-| `app/components/Item/Picker.vue` | `app/documents/Item/Picker.md` |
+- [ ] **Step 1: Implement the page structure**
+Create the UI with a sidebar for component list and a main area for preview.
 
-Update existing documents for `UnitToken`, `HexCell`, and `HexGrid` to reflect new props/emits.
+```vue
+<!-- app/pages/dev/components.vue -->
+<template>
+  <div v-if="isDev" class="flex h-screen bg-gray-900 text-white">
+    <!-- Sidebar -->
+    <div class="w-64 border-r border-gray-800 flex flex-col">
+      <div class="p-4 border-b border-gray-800 font-bold text-lg">
+        Component Explorer
+      </div>
+      <div class="flex-1 overflow-y-auto p-2 space-y-1">
+        <button
+          v-for="comp in components"
+          :key="comp.path"
+          @click="selectedComponent = comp"
+          class="w-full text-left px-3 py-2 rounded transition-colors"
+          :class="selectedComponent?.path === comp.path ? 'bg-blue-600' : 'hover:bg-gray-800'"
+        >
+          <div class="font-medium text-sm">{{ comp.name }}</div>
+          <div class="text-xs text-gray-400">{{ comp.type }}</div>
+        </button>
+      </div>
+    </div>
 
----
+    <!-- Main Content -->
+    <div class="flex-1 overflow-y-auto p-8">
+      <div v-if="selectedComponent">
+        <h1 class="text-3xl font-bold mb-2">{{ selectedComponent.name }}</h1>
+        <p class="text-gray-400 mb-6 italic">{{ selectedComponent.description }}</p>
 
-## Visual Layout
+        <div class="space-y-12">
+          <section v-for="example in selectedComponent.examples" :key="example.name">
+            <h2 class="text-xl font-semibold mb-4 border-b border-gray-800 pb-2">
+              {{ example.name }}
+            </h2>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <!-- Preview -->
+              <div class="bg-gray-800 rounded-lg p-8 flex items-center justify-center border border-gray-700 min-h-[200px]">
+                <component 
+                  :is="getComponentName(selectedComponent.componentPath)" 
+                  v-bind="example.props"
+                >
+                  <!-- Basic slot handling if possible, or just default -->
+                </component>
+              </div>
 
+              <!-- Details -->
+              <div class="space-y-4">
+                <div>
+                  <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Props (JSON)</h3>
+                  <pre class="bg-black p-4 rounded text-xs text-blue-400 overflow-x-auto">{{ JSON.stringify(example.props, null, 2) }}</pre>
+                </div>
+                <div>
+                  <h3 class="text-xs font-bold uppercase text-gray-500 mb-2">Usage</h3>
+                  <pre class="bg-black p-4 rounded text-xs text-green-400 overflow-x-auto">{{ example.usage }}</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div v-else class="h-full flex items-center justify-center text-gray-500 italic">
+        Select a component from the sidebar to preview
+      </div>
+    </div>
+  </div>
+  <div v-else class="p-8 text-center">
+    <h1 class="text-2xl font-bold">404 - Not Found</h1>
+    <p>This page is only available in development mode.</p>
+  </div>
+</template>
+
+<script setup lang="ts">
+const isDev = import.meta.dev;
+const { data: components } = await useFetch('/api/dev/components');
+const selectedComponent = ref(null);
+
+function getComponentName(componentPath: string) {
+  // app/components/Element/BaseButton.vue -> ElementBaseButton
+  const path = componentPath.replace('app/components/', '').replace('.vue', '');
+  return path.split('/').join('');
+}
+</script>
+
+<style scoped>
+/* Any specific styles for the explorer */
+</style>
 ```
-┌─────────────┐
-│   [image]   │
-│  Champion   │
-│  Name ───── │
-├─────────────┤
-│ [▪] [▪] [▪] │  ← 3 item slots
-└─────────────┘
+
+- [ ] **Step 2: Add navigation link (Optional but helpful)**
+Add a link to the explorer in the main layout or index page when in dev.
+
+- [ ] **Step 3: Verify**
+Go to `/dev/components` and check if components are rendered correctly.
+Verify that props are applied.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/pages/dev/components.vue
+git commit -m "dev: add Dev Component Explorer page"
 ```
-
-Each slot:
-- Empty: dim background, `+` icon, highlights on drag-over
-- Occupied: item image (24×24px), remove button on hover
-
----
-
-## Implementation Order
-
-| # | Task | Files |
-|---|------|-------|
-| 1 | Add `Item`, `ItemSlot`, `UnitItems` types | `types/item.ts`, `types/team.ts` |
-| 2 | Add item data | `data/items.ts` |
-| 3 | Extend drag payload type | `types/drag.ts` |
-| 4 | Build `ItemSlot.vue` + doc | `components/Item/`, `documents/Item/` |
-| 5 | Build `ItemSlots.vue` + doc | `components/Item/`, `documents/Item/` |
-| 6 | Update `UnitToken.vue` | `components/Board/UnitToken.vue` |
-| 7 | Update `HexCell.vue` | `components/Board/HexCell.vue` |
-| 8 | Update `HexGrid.vue` | `components/Board/HexGrid.vue` |
-| 9 | Add item methods to `useTeamBuilder` | `composables/tft/useTeamBuilder.ts` |
-| 10 | Add item drag handlers to `useDragDrop` | `composables/tft/useDragDrop.ts` |
-| 11 | Build `Item/Picker.vue` + doc | `components/Item/`, `documents/Item/` |
-| 12 | Update docs for modified components | `documents/Board/` |
