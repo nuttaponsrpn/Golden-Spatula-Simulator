@@ -45,7 +45,7 @@
           v-else
           class="flex h-full w-full items-center justify-center bg-gray-700 text-xs font-bold text-gray-400"
         >
-          {{ (getChampionById(champId)?.name ?? champId)[0] }}
+          {{ (getChampionById(champId)?.name ?? champId)?.[0] ?? "?" }}
         </div>
       </div>
     </div>

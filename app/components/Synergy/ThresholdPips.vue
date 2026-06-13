@@ -26,6 +26,7 @@ const props = defineProps<{
 }>();
 
 const maxCount = computed(() => {
+  if (!props.thresholds || props.thresholds.length === 0) return 0;
   const last = props.thresholds[props.thresholds.length - 1];
   return last?.count ?? 0;
 });

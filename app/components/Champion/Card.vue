@@ -38,7 +38,7 @@
         v-else
         class="flex h-full w-full items-center justify-center bg-gray-700 text-lg font-bold text-gray-400"
       >
-        {{ champion.name[0] }}
+        {{ champion?.name?.[0] ?? "?" }}
       </div>
     </div>
 
