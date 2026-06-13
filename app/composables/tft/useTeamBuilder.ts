@@ -69,6 +69,7 @@ export function useTeamBuilder() {
       championId,
       position: pos,
       items: [null, null, null],
+      stars: 1,
     };
 
     teamUnits.value = [...teamUnits.value, unit];
@@ -142,6 +143,16 @@ export function useTeamBuilder() {
     teamUnits.value = updated;
   }
 
+  function setUnitStars(unitId: string, stars: 1 | 2 | 3): void {
+    const idx = teamUnits.value.findIndex((u) => u.id === unitId);
+    if (idx < 0) return;
+    const unit = teamUnits.value[idx];
+    if (!unit) return;
+    const updated = [...teamUnits.value];
+    updated[idx] = { ...unit, stars };
+    teamUnits.value = updated;
+  }
+
   function clearBoard(): void {
     teamUnits.value = [];
   }
@@ -170,6 +181,7 @@ export function useTeamBuilder() {
             championId: champId,
             position: { row: r, col: c },
             items: [null, null, null],
+            stars: 1,
           };
           teamUnits.value = [...teamUnits.value, unit];
           placedCount++;
@@ -190,6 +202,7 @@ export function useTeamBuilder() {
     swapUnits,
     addItemToUnit,
     removeItemFromUnit,
+    setUnitStars,
     clearBoard,
     isChampionOnBoard,
     loadComp,

@@ -10,6 +10,7 @@ export interface TeamUnit {
   championId: string;
   position: BoardPosition;
   items: UnitItems;
+  stars: 1 | 2 | 3;
 }
 
 export type BoardCell =

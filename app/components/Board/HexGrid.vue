@@ -36,6 +36,7 @@
             @drag-over="(pos, ev) => onCellDragOver(ev, pos)"
             @drag-leave="(pos, ev) => onCellDragLeave(ev, pos)"
             @drop="(pos, ev) => onCellDrop(ev, pos)"
+            @star-change="onStarChange"
             @item-drop="onItemDrop"
             @item-remove="onItemRemove"
           />
@@ -104,7 +105,7 @@ const scale = computed(() => {
 const scaledHeight = computed(() => BOARD_HEIGHT * scale.value);
 
 const { byId } = useItems();
-const { addItemToUnit, removeItemFromUnit } = useTeamBuilder();
+const { addItemToUnit, removeItemFromUnit, setUnitStars } = useTeamBuilder();
 const {
   dragOverPosition,
   isDragging,
@@ -125,5 +126,9 @@ function onItemDrop(unitId: string, slotIndex: 0 | 1 | 2, item: Item): void {
 
 function onItemRemove(unitId: string, slotIndex: 0 | 1 | 2): void {
   removeItemFromUnit(unitId, slotIndex);
+}
+
+function onStarChange(unitId: string, stars: 1 | 2 | 3): void {
+  setUnitStars(unitId, stars);
 }
 </script>
