@@ -41,13 +41,18 @@
         <li
           v-for="option in options"
           :key="option.value"
-          class="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs transition-colors hover:bg-gray-800"
+          class="flex items-center gap-2 px-3 py-2 text-xs transition-colors"
           :class="[
-            modelValue === option.value ? 'bg-indigo-900/40 text-indigo-300' : 'text-gray-300'
+            option.disabled
+              ? 'cursor-not-allowed text-gray-600'
+              : modelValue === option.value
+                ? 'cursor-pointer bg-indigo-900/40 text-indigo-300 hover:bg-indigo-900/60'
+                : 'cursor-pointer text-gray-300 hover:bg-gray-800',
           ]"
           role="option"
           :aria-selected="modelValue === option.value"
-          @click="select(option.value)"
+          :aria-disabled="option.disabled"
+          @click="!option.disabled && select(option.value)"
         >
           <img
             v-if="option.icon"
@@ -69,6 +74,7 @@ interface Option {
   value: string | number;
   label: string;
   icon?: string;
+  disabled?: boolean;
 }
 
 const props = defineProps<{
