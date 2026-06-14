@@ -55,11 +55,12 @@ export default defineEventHandler(async (event) => {
     for await (const call of run.toolCalls) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deepagents ToolCallStream has no stable public type
       const c = (call as unknown) as { id?: string; name?: string; input?: unknown; output?: unknown; status?: string };
+      const output = c.output instanceof Promise ? await c.output : c.output;
       pushEvent("tool_call", {
         id: c.id ?? crypto.randomUUID(),
         toolName: c.name ?? "unknown",
         input: c.input ?? {},
-        resultSummary: c.output ? String(c.output).slice(0, 200) : undefined,
+        resultSummary: output != null ? String(output).slice(0, 200) : undefined,
         status: c.status === "error" ? "error" : "done",
       });
     }
