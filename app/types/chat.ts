@@ -4,6 +4,15 @@ export type ChatRole = "user" | "assistant" | "system";
 
 export type ChatMessageStatus = "sending" | "streaming" | "done" | "error";
 
+// Tool call tracking for DeepAgents provider
+export interface ToolCallStep {
+  id: string;
+  toolName: string;           // "get_champions", "get_traits", etc.
+  input: Record<string, unknown>; // params the agent passed
+  resultSummary?: string;     // short human-readable summary
+  status: "pending" | "done" | "error";
+}
+
 export interface ChatMessage {
   id: string;
   sessionId: string;
@@ -13,6 +22,8 @@ export interface ChatMessage {
   timestamp: number;
   status: ChatMessageStatus;
   boardSnapshot?: PlacedUnits;
+  toolCalls?: ToolCallStep[];  // populated by DeepAgents provider
+  thinkingText?: string;       // optional chain-of-thought text
 }
 
 export interface ChatSession {
@@ -32,11 +43,14 @@ export interface AiUnitSpec {
     row: number;
     col: number;
   };
+  reason?: string; // 1-sentence role + synergy explanation
 }
 
 export interface AiTeamCompResponse {
   explanation: string;
   playstyle: string;
+  synergyReasoning?: string; // why these synergies — tiers reached and bonuses
+  itemReasoning?: string;    // why each item on each carry
   units: AiUnitSpec[];
 }
 

@@ -86,13 +86,16 @@ For team composition requests (only after the user has confirmed):
   "comp": {
     "explanation": "2-3 sentences explaining why this comp works",
     "playstyle": "early/mid/late game strategy and gameplan",
+    "synergyReasoning": "Why these synergies — which tiers are reached and what each active bonus does",
+    "itemReasoning": "Why each item on each carry — stat fit, ability type, or combo explanation",
     "units": [
       {
         "championId": "exact_id_from_champion_roster",
         "stars": 1,
         "items": ["exact_id_from_item_roster"],
         "isCarry": true,
-        "position": { "row": 3, "col": 3 }
+        "position": { "row": 3, "col": 3 },
+        "reason": "1 sentence: role this unit fills + synergy it activates (e.g. 'Jinx opens Rapidfire and reaches Enforcer Gold')"
       }
     ]
   }
@@ -110,7 +113,10 @@ Rules:
 - items entries MUST be id values from the Item Roster above, not names
 - Suggest exactly 10 units; each unit can have 0-3 items
 - position is optional: row 0-3 (0 = front), col 0-6 (0 = left)
-- comp field is ONLY present for team composition requests after user confirmation; omit it otherwise`;
+- comp field is ONLY present for team composition requests after user confirmation; omit it otherwise
+- synergyReasoning: explain which synergy thresholds are active and what the bonus does
+- itemReasoning: explain why each item was chosen for its carrier (stat fit, ability type)
+- reason on each unit: 1 sentence explaining why that champion is in the comp`;
   }
 
   return { buildSystemPrompt };

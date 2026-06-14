@@ -76,6 +76,12 @@ function extractDisplayText(rawContent: string): string {
       if (typeof comp.playstyle === "string" && comp.playstyle.trim()) {
         parts.push(`🎮 **วิธีการเล่น:**\n${comp.playstyle.trim()}`);
       }
+      if (typeof comp.synergyReasoning === "string" && comp.synergyReasoning.trim()) {
+        parts.push(`🔗 **Synergy Reasoning:**\n${comp.synergyReasoning.trim()}`);
+      }
+      if (typeof comp.itemReasoning === "string" && comp.itemReasoning.trim()) {
+        parts.push(`⚔️ **Item Reasoning:**\n${comp.itemReasoning.trim()}`);
+      }
     }
     
     if (parts.length > 0) return parts.join("\n\n");
@@ -317,6 +323,12 @@ export function useChatComposer(opts: ComposerOptions) {
         }
         if (comp.playstyle?.trim()) {
           parts.push(`🎮 **วิธีการเล่น:**\n${comp.playstyle.trim()}`);
+        }
+        if (comp.synergyReasoning?.trim()) {
+          parts.push(`🔗 **Synergy Reasoning:**\n${comp.synergyReasoning.trim()}`);
+        }
+        if (comp.itemReasoning?.trim()) {
+          parts.push(`⚔️ **Item Reasoning:**\n${comp.itemReasoning.trim()}`);
         }
         displayContent = parts.join("\n\n") || rawAccumulator;
       } else if (parseResult.kind === "text-only") {

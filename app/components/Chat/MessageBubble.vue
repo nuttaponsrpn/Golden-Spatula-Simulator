@@ -14,6 +14,12 @@
           : 'bg-gray-800 text-gray-100 rounded-tl-sm',
       ]"
     >
+      <ChatThinkingPanel
+        v-if="message.toolCalls && message.toolCalls.length > 0"
+        :steps="message.toolCalls"
+        :is-streaming="message.status === 'streaming'"
+      />
+
       <div v-if="message.status === 'streaming' && !message.displayContent">
         <span class="inline-flex gap-1 items-center text-gray-400">
           <span class="animate-bounce" style="animation-delay: 0ms">●</span>
@@ -87,6 +93,20 @@
             <pre class="text-xs text-gray-300 font-mono whitespace-pre">{{ JSON.stringify(message.boardSnapshot, null, 2) }}</pre>
           </div>
         </details>
+
+        <div
+          v-if="compReasoning.synergy || compReasoning.items"
+          class="mt-4 pt-4 border-t border-gray-700 space-y-3"
+        >
+          <div v-if="compReasoning.synergy">
+            <p class="text-xs font-semibold text-gray-400 mb-1">🔗 Synergy Reasoning</p>
+            <p class="text-xs text-gray-300 leading-relaxed">{{ compReasoning.synergy }}</p>
+          </div>
+          <div v-if="compReasoning.items">
+            <p class="text-xs font-semibold text-gray-400 mb-1">⚔️ Item Reasoning</p>
+            <p class="text-xs text-gray-300 leading-relaxed">{{ compReasoning.items }}</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -132,6 +152,25 @@ const costBorderClass = (cost: ChampionCost): string => {
   };
   return map[cost];
 };
+
+const compReasoning = computed(() => {
+  if (!props.message.boardSnapshot) return { synergy: null, items: null };
+  try {
+    const cleaned = props.message.content
+      .replace(/^```[a-z]*\n?/i, "")
+      .replace(/\n?```$/i, "")
+      .trim();
+    if (!cleaned.startsWith("{")) return { synergy: null, items: null };
+    const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+    const comp = parsed.comp as Record<string, unknown> | undefined;
+    return {
+      synergy: typeof comp?.synergyReasoning === "string" ? comp.synergyReasoning : null,
+      items: typeof comp?.itemReasoning === "string" ? comp.itemReasoning : null,
+    };
+  } catch {
+    return { synergy: null, items: null };
+  }
+});
 </script>
 
 <style scoped>
