@@ -118,5 +118,20 @@ export function createGsTools(apiBase: string) {
     },
   );
 
-  return [getChampionsTool, getTraitsTool, getItemsTool, getLineupsTool];
+  const getVersionTool = tool(
+    async () => {
+      const raw = await $fetch<unknown>("/api/gs/version", {
+        baseURL: apiBase,
+      });
+      return JSON.stringify(raw);
+    },
+    {
+      name: "get_version",
+      description:
+        "Fetch the current TFT version info including version id (version), season, and version name (name).",
+      schema: z.object({}),
+    },
+  );
+
+  return [getChampionsTool, getTraitsTool, getItemsTool, getLineupsTool, getVersionTool];
 }
