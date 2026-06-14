@@ -1,6 +1,6 @@
 # ChatAnchorSelector
 
-> Modal for picking "anchor" champions — TFT champions locked into every team comp the AI suggests. Used both when starting a new session and when editing anchors on an existing one.
+> Modal for picking "anchor" champions — Golden Spatula champions locked into every team comp the AI suggests. Used both when starting a new session and when editing anchors on an existing one.
 
 **Type:** Smart
 **Component:** `app/components/Chat/AnchorSelector.vue`

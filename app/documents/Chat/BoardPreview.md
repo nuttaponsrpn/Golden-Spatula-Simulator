@@ -1,6 +1,6 @@
 # ChatBoardPreview
 
-> Read-only board display for the Chat page. Shows a TFT hex grid with placed units but no drag-drop or editing interaction.
+> Read-only board display for the Chat page. Shows a Golden Spatula hex grid with placed units but no drag-drop or editing interaction.
 
 **Type:** Pure
 **Component:** `app/components/Chat/BoardPreview.vue`
