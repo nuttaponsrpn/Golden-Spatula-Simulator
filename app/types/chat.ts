@@ -30,6 +30,7 @@ export interface ChatSession {
   id: string;
   title: string;
   anchorChampionIds: string[];
+  gameMode: string; // GS mode identifier, e.g. "17" for TFT
   createdAt: number;
   updatedAt: number;
 }

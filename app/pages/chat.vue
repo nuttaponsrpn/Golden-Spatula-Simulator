@@ -27,6 +27,11 @@
 
         <ChatProviderConfig />
 
+        <ChatVersionSelector
+          :has-active-session="!!activeSessionId"
+          @version-change="onVersionChange"
+        />
+
         <!-- Anchor badges / picker -->
         <button
           class="flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors"
@@ -258,13 +263,21 @@ function startNewSession(): void {
   showAnchorSelector.value = true;
 }
 
-function switchSession(id: string): void {
+async function switchSession(id: string): Promise<void> {
   // Discard pending unsaved session if user switches away before sending anything
   pendingSession.value = null;
   previewUnits.value = null;
   const session = sessions.value.find((s) => s.id === id);
   // Guard against sessions persisted before anchorChampionIds was added to the schema
   anchorChampionIds.value = Array.isArray(session?.anchorChampionIds) ? session.anchorChampionIds : [];
+
+  // Restore game mode for this session — re-init data if mode changed
+  const sessionMode = session?.gameMode ?? "17";
+  if (sessionMode !== gsActiveMode.value) {
+    const result = await init(sessionMode);
+    if (result.status === "error" && result.error) showError(result.error);
+  }
+
   activeSessionId.value = id;
 }
 
@@ -307,6 +320,7 @@ async function prepareNewSession(anchorIds: string[]): Promise<void> {
     id: crypto.randomUUID(),
     title: "การสนทนาใหม่",
     anchorChampionIds: anchorIds,
+    gameMode: gsActiveMode.value,
     createdAt: now,
     updatedAt: now,
   };
@@ -376,6 +390,15 @@ function onLoadToBoard(): void {
   if (!previewUnits.value) return;
   loadUnits(previewUnits.value);
   navigateTo("/builder");
+}
+
+async function onVersionChange(mode: string): Promise<void> {
+  const result = await init(mode);
+  if (result.status === "error" && result.error) {
+    showError(result.error);
+    return;
+  }
+  startNewSession();
 }
 
 onUnmounted(() => {
