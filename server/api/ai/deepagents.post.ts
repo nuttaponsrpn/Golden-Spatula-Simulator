@@ -1,6 +1,7 @@
+import { Readable } from "node:stream";
 import { createDeepAgent } from "deepagents";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import { createError, defineEventHandler, readBody, sendStream } from "h3";
+import { createError, defineEventHandler, getRequestHost, readBody, sendStream } from "h3";
 import { createGsTools } from "~/utils/gs-tools";
 
 interface DeepAgentsRequestBody {
@@ -23,8 +24,10 @@ export default defineEventHandler(async (event) => {
     m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content),
   );
 
-  // Empty baseURL — $fetch in server context resolves relative to the running server
-  const tools = createGsTools("");
+  // Use absolute internal URL so $fetch in gs-tools resolves correctly on the server
+  const host = getRequestHost(event, { xForwardedHost: false });
+  const protocol = event.node.req.socket && "encrypted" in event.node.req.socket ? "https" : "http";
+  const tools = createGsTools(`${protocol}://${host}`);
 
   const agent = createDeepAgent({
     model: "google-genai/gemini-2.5-pro",
@@ -45,23 +48,25 @@ export default defineEventHandler(async (event) => {
     }
   })().catch(() => {});
 
-  const stream = new ReadableStream({
-    async start(controller) {
-      const encoder = new TextEncoder();
-      try {
-        for await (const msg of run.messages) {
-          for await (const token of msg.text) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(token)}\n\n`));
-          }
+  // Use Node.js Readable — h3's sendStream requires a Node stream, not Web ReadableStream
+  const nodeStream = new Readable({ read() {} });
+
+  (async () => {
+    try {
+      for await (const msg of run.messages) {
+        for await (const token of msg.text) {
+          nodeStream.push(`data: ${JSON.stringify(token)}\n\n`);
         }
-      } finally {
-        controller.close();
       }
-    },
-  });
+    } catch {
+      // stream ends on error
+    } finally {
+      nodeStream.push(null);
+    }
+  })();
 
   event.node.res.setHeader("Content-Type", "text/event-stream");
   event.node.res.setHeader("Cache-Control", "no-cache");
   event.node.res.setHeader("Connection", "keep-alive");
-  return sendStream(event, stream);
+  return sendStream(event, nodeStream);
 });
