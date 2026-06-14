@@ -1277,4 +1277,10 @@ Whenever a significant architectural choice is made, a complex bug is resolved, 
 3. **AUTO-COMPACT TRIGGER:**
    If you notice the `docs/decisions/DECISION_LOG.md` is getting too long (exceeding ~50 lines of active context), proactively suggest performing a "Garbage Collection". If agreed, summarize older decisions into a `docs/decisions/archive/` folder and keep only the active context in the main log.
 
+4. **PLAN COMPLETION — MOVE TO `docs/done/`:**
+   When an implementation plan under `docs/planning/` has been fully implemented (all steps done, committed to git), move the file to `docs/done/`. Do this in the same commit as the final implementation step, or as a standalone cleanup commit immediately after.
+   - Plans that are **reference docs** (strategy guides, scoring docs, data source references used as ongoing context) stay in `docs/planning/` and are never moved.
+   - Plans that are **implementation checklists** (step-by-step tasks, file creation lists, migration plans) must be moved once done.
+   - After moving, verify no other file references the old path and update any links if needed.
+
 Always remind the user to review these updated documents after a major session.
