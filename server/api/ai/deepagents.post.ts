@@ -1,18 +1,38 @@
-import { Readable } from "node:stream";
 import { createDeepAgent } from "deepagents";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import { createError, defineEventHandler, getRequestHost, readBody, sendStream } from "h3";
+import {
+  createError,
+  defineEventHandler,
+  getRequestHost,
+  readBody,
+  sendStream,
+  setResponseHeaders,
+} from "h3";
 import { createGsTools } from "~/utils/gs-tools";
+
+// Allow up to 300s on Vercel Pro (long-running AI response)
+export const maxDuration = 300;
 
 interface DeepAgentsRequestBody {
   messages: { role: "user" | "assistant"; content: string }[];
   systemPrompt: string;
 }
 
+interface ToolCallStreamLike {
+  readonly name: string;
+  readonly callId: string;
+  readonly input: unknown;
+  readonly output: Promise<unknown>;
+  readonly status: Promise<string>;
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig();
   if (!config.geminiApiKey) {
-    throw createError({ statusCode: 503, statusMessage: "DeepAgents: Gemini API key not configured" });
+    throw createError({
+      statusCode: 503,
+      statusMessage: "DeepAgents: Gemini API key not configured",
+    });
   }
 
   // deepagents/langchain reads GOOGLE_API_KEY from env
@@ -36,53 +56,75 @@ export default defineEventHandler(async (event) => {
     permissions: [],
   });
 
-  console.log("[deepagents] calling streamEvents...");
-  const run = await agent.streamEvents(
-    { messages: lcMessages },
-    { version: "v3" },
-  );
-  console.log("[deepagents] streamEvents returned, run keys:", Object.keys(run as object));
+  const run = await agent.streamEvents({ messages: lcMessages }, { version: "v3" });
 
-  // Use Node.js Readable — h3's sendStream requires a Node stream, not Web ReadableStream
-  const nodeStream = new Readable({ read() {} });
+  // Use Web ReadableStream (required for Vercel — Node.js Readable doesn't stream properly)
+  const encoder = new TextEncoder();
+  let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
+
+  const webStream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      streamController = controller;
+    },
+    cancel() {
+      streamController = null;
+    },
+  });
 
   function pushEvent(type: string, payload: unknown): void {
-    nodeStream.push(`data: ${JSON.stringify({ type, payload })}\n\n`);
+    streamController?.enqueue(encoder.encode(`data: ${JSON.stringify({ type, payload })}\n\n`));
   }
 
-  // Tool call events — streamed to client as they happen
-  (async () => {
-    for await (const call of run.toolCalls) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deepagents ToolCallStream has no stable public type
-      const c = (call as unknown) as { id?: string; name?: string; input?: unknown; output?: unknown; status?: string };
-      const output = c.output instanceof Promise ? await c.output : c.output;
-      pushEvent("tool_call", {
-        id: c.id ?? crypto.randomUUID(),
-        toolName: c.name ?? "unknown",
-        input: c.input ?? {},
-        resultSummary: output != null ? String(output).slice(0, 200) : undefined,
-        status: c.status === "error" ? "error" : "done",
-      });
+  function closeStream(): void {
+    try {
+      streamController?.close();
+    } catch {
+      /* already closed */
     }
-  })().catch((err) => console.error("[deepagents] toolCalls error:", err));
+    streamController = null;
+  }
 
-  // Message token events
+  // Tool calls — iterate run.toolCalls (registered by createToolCallTransformer in ReactAgent.compile)
+  // Cast needed because TypeScript loses the concrete TTools generic after createDeepAgent
+  const runAny = run as unknown as { toolCalls?: AsyncIterable<ToolCallStreamLike> };
+  if (runAny.toolCalls) {
+    (async () => {
+      for await (const call of runAny.toolCalls!) {
+        const [output, status] = await Promise.all([
+          call.output.catch(() => undefined),
+          call.status.catch(() => "error"),
+        ]);
+        pushEvent("tool_call", {
+          id: call.callId,
+          toolName: call.name,
+          input: call.input,
+          resultSummary: output != null ? String(output).slice(0, 200) : undefined,
+          status: status === "error" ? "error" : "done",
+        });
+      }
+    })().catch((err) => console.error("[deepagents] toolCalls error:", err));
+  }
+
+  // Message token streaming — uses run.messages projection (higher-level, works across all models)
   (async () => {
     try {
       for await (const msg of run.messages) {
         for await (const token of msg.text) {
-          pushEvent("token", token);
+          if (token) pushEvent("token", token);
         }
       }
     } catch (err) {
       console.error("[deepagents] stream error:", err);
     } finally {
-      nodeStream.push(null);
+      closeStream();
     }
   })();
 
-  event.node.res.setHeader("Content-Type", "text/event-stream");
-  event.node.res.setHeader("Cache-Control", "no-cache");
-  event.node.res.setHeader("Connection", "keep-alive");
-  return sendStream(event, nodeStream);
+  setResponseHeaders(event, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  return sendStream(event, webStream);
 });
