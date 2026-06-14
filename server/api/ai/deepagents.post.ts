@@ -12,7 +12,11 @@ import {
   setResponseHeaders,
 } from "h3";
 import { createGsTools } from "~/utils/gs-tools";
-import { fetchVersionByMode } from "../../utils/gsVersion";
+import {
+  buildGuardRailContext,
+  validateCompOutput,
+  buildRetryFeedback,
+} from "../../utils/gsGuardRail";
 import {
   buildRouterPrompt,
   buildPlannerProposePrompt,
@@ -21,6 +25,9 @@ import {
   buildClarifyPrompt,
   buildBuilderPrompt,
 } from "../../utils/gsPromptBuilder";
+
+// Maximum number of Builder regenerations when output validation fails.
+const MAX_BUILDER_RETRIES = 2;
 
 // Allow up to 300s on Vercel Pro (long-running AI response)
 export const maxDuration = 300;
@@ -62,14 +69,12 @@ export default defineEventHandler(async (event) => {
   const apiBase = `${protocol}://${host}`;
   const tools = createGsTools(apiBase, body.activeMode);
 
-  // ── Stage 0: Version Bootstrap ──────────────────────────────────────────
-  let versionName: string | undefined;
-  try {
-    const version = await fetchVersionByMode(body.activeMode ?? "17");
-    versionName = version.name;
-  } catch {
-    // Non-fatal — prompts work without a version name
-  }
+  // ── Stage 0: Guard Rail — deterministic pre-fetch ───────────────────────
+  // Resolve the version and base data sets up front so prompts embed verified
+  // facts and the Builder output can be validated against real ID allowlists.
+  const guard = await buildGuardRailContext({ apiBase, mode: body.activeMode ?? "17" });
+  const versionName = guard.versionName;
+  const guardContext = guard.contextPrompt || undefined;
 
   const anchorChampions = (body.anchorChampions ?? []) as { id: string; name: string }[];
 
@@ -158,6 +163,58 @@ export default defineEventHandler(async (event) => {
     return output;
   }
 
+  // Run the Builder with output validation + automatic retry.
+  // The Builder output STREAMS to the client token-by-token. After each run
+  // completes we validate the full text against the guard rail allowlists; if it
+  // fails we send a "reset" event (telling the client to discard what it streamed)
+  // and re-run with corrective feedback. Up to MAX_BUILDER_RETRIES retries.
+  async function runBuilderWithValidation(plannerOutput: string): Promise<void> {
+    let retryFeedback: string | undefined;
+
+    for (let attempt = 0; attempt <= MAX_BUILDER_RETRIES; attempt++) {
+      const builderAgent = createDeepAgent({
+        model: "google-genai:gemini-2.5-pro",
+        tools,
+        systemPrompt: buildBuilderPrompt({
+          versionName,
+          plannerOutput,
+          guardContext,
+          retryFeedback,
+        }),
+        permissions: [],
+      });
+
+      const builderMessages = [new HumanMessage(plannerOutput || "สร้างทีม TFT ตามแผนที่เลือก")];
+      const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
+      wireToolCallEvents(builderRun);
+
+      // Stream this attempt to the client as it generates.
+      const output = await streamRunToClient(builderRun);
+
+      const validation = validateCompOutput(output, guard);
+      if (validation.valid) {
+        console.log(`[deepagents] builder — validation PASSED on attempt ${attempt + 1}`);
+        return;
+      }
+
+      console.warn(
+        `[deepagents] builder — validation FAILED on attempt ${attempt + 1}: ${validation.errors.join("; ")}`,
+      );
+
+      // Out of retries → keep the streamed output as-is. The client maps the comp
+      // defensively (drops unknown IDs), so a partial comp is acceptable.
+      if (attempt === MAX_BUILDER_RETRIES) {
+        console.warn(`[deepagents] builder — retries exhausted, keeping last output`);
+        return;
+      }
+
+      // Tell the client to discard the invalid stream, then re-run with feedback.
+      pushEvent("reset", {});
+      retryFeedback = buildRetryFeedback(validation.errors);
+      pushEvent("stage", { stage: "builder", label: `ตรวจสอบและแก้ไข (รอบ ${attempt + 2})...` });
+    }
+  }
+
   // ── Main pipeline ────────────────────────────────────────────────────────
   (async () => {
     const t0 = Date.now();
@@ -208,7 +265,7 @@ export default defineEventHandler(async (event) => {
         const answerAgent = createDeepAgent({
           model: "google-genai:gemini-2.5-flash",
           tools,
-          systemPrompt: buildAnswerPrompt({ versionName }),
+          systemPrompt: buildAnswerPrompt({ versionName, guardContext }),
           permissions: [],
         });
 
@@ -256,25 +313,10 @@ export default defineEventHandler(async (event) => {
         const selectedPlanJson = await collectRunText(plannerBuildRun);
         console.log(`[deepagents][${elapsed()}] plan — extracted plan: ${selectedPlanJson.slice(0, 200)}`);
 
-        // ── Builder receives the selected plan ────────────────────────────
+        // ── Builder receives the selected plan (streamed + validated + retry) ─
         pushEvent("stage", { stage: "builder", label: "สร้างทีม..." });
 
-        const builderPromptText = buildBuilderPrompt({
-          versionName,
-          plannerOutput: selectedPlanJson || latestAssistantText,
-        });
-
-        const builderAgent = createDeepAgent({
-          model: "google-genai:gemini-2.5-pro",
-          tools,
-          systemPrompt: builderPromptText,
-          permissions: [],
-        });
-
-        const builderMessages = [new HumanMessage(selectedPlanJson || "สร้างทีม TFT ตามแผนที่เลือก")];
-        const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
-        wireToolCallEvents(builderRun);
-        await streamRunToClient(builderRun);
+        await runBuilderWithValidation(selectedPlanJson || latestAssistantText);
 
       } else {
         // ── build_team path: Propose phase → stream options to user ───────
@@ -284,7 +326,7 @@ export default defineEventHandler(async (event) => {
         const proposeAgent = createDeepAgent({
           model: "google-genai:gemini-2.5-pro",
           tools,
-          systemPrompt: buildPlannerProposePrompt({ versionName, anchorChampions }),
+          systemPrompt: buildPlannerProposePrompt({ versionName, anchorChampions, guardContext }),
           permissions: [],
         });
 

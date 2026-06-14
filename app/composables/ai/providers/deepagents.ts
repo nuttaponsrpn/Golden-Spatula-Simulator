@@ -51,6 +51,8 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
                 if (event.payload) yield event.payload;
               } else if (event.type === "stage" && opts?.onStage) {
                 opts.onStage(event.payload as { stage: string; label: string });
+              } else if (event.type === "reset" && opts?.onReset) {
+                opts.onReset();
               } else if (event.type === "tool_call" && opts?.onToolCall) {
                 opts.onToolCall(event.payload as ToolCallStep);
               } else if (event.type === "error") {

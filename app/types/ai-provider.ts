@@ -25,6 +25,8 @@ export interface AiStreamOptions {
   onToolCall?: (step: ToolCallStep) => void;
   /** Called when the AI transitions to a new processing stage (DeepAgents only) */
   onStage?: (payload: AiStagePayload) => void;
+  /** Called when the stream is restarted (e.g. Builder retry after validation) — clear accumulated text (DeepAgents only) */
+  onReset?: () => void;
   /** Champion anchors forwarded to the DeepAgents Planner for strategy seeding */
   anchorChampions?: { id: string; name: string }[];
 }

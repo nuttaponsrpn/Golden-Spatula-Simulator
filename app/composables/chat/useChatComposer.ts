@@ -299,6 +299,10 @@ export function useChatComposer(opts: ComposerOptions) {
     streamingToolCalls.value = [];
     streamingStage.value = null;
 
+    // Declared before sendMessage so the onReset callback can clear it when the
+    // server restarts the stream (e.g. Builder retry after validation failure).
+    let rawAccumulator = "";
+
     const providerResult = aiProvider.sendMessage(
       aiMessages,
       systemPrompt,
@@ -308,6 +312,14 @@ export function useChatComposer(opts: ComposerOptions) {
         anchorChampions: anchorChampions.map((c) => ({ id: c.id, name: c.name })),
         onStage: (payload) => {
           streamingStage.value = payload;
+        },
+        onReset: () => {
+          // Discard everything streamed so far — a fresh, validated run follows.
+          rawAccumulator = "";
+          streamingContent.value = "";
+          history.messages.value = history.messages.value.map((m) =>
+            m.id === aiMsgId ? { ...m, content: "", displayContent: "" } : m,
+          );
         },
         onToolCall: (step) => {
           const existing = streamingToolCalls.value.findIndex((s) => s.id === step.id);
@@ -329,8 +341,6 @@ export function useChatComposer(opts: ComposerOptions) {
       });
       return { status: "error", error: providerResult.error };
     }
-
-    let rawAccumulator = "";
 
     try {
       for await (const chunk of providerResult.iterator) {

@@ -14,6 +14,7 @@ export interface RouterPromptOptions {
 export interface PlannerProposeOptions {
   versionName?: string;
   anchorChampions?: AnchorChampion[];
+  guardContext?: string;   // verified version + trait block from the guard rail
 }
 
 export interface PlannerBuildOptions {
@@ -25,6 +26,7 @@ export interface PlannerBuildOptions {
 
 export interface AnswerPromptOptions {
   versionName?: string;
+  guardContext?: string;   // verified version + trait block from the guard rail
 }
 
 // Keep existing exports for backward compatibility
@@ -36,6 +38,8 @@ export interface PlannerPromptOptions {
 export interface BuilderPromptOptions {
   versionName?: string;
   plannerOutput: string;
+  guardContext?: string;   // verified version + trait block from the guard rail
+  retryFeedback?: string;  // corrective feedback when re-running after validation failure
 }
 
 const CLARIFICATION_PROTOCOL = `## Team Composition Clarification Protocol
@@ -189,26 +193,35 @@ Respond with a single JSON object. No markdown. No extra text.
 // Surveys the pool and presents A/B/C strategy options to the user.
 // Does NOT fill unit slots — that is the Builder's job after the user selects.
 export function buildPlannerProposePrompt(opts: PlannerProposeOptions): string {
-  const { versionName, anchorChampions = [] } = opts;
+  const { versionName, anchorChampions = [], guardContext } = opts;
   const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+  const guardSection = guardContext ? `\n${guardContext}\n` : "";
   const anchorSection =
     anchorChampions.length > 0
       ? `\n## Anchor Champions (MUST appear in every strategy option)\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
       : "";
 
+  // When the guard rail supplied verified version + traits, the agent can skip
+  // those discovery calls and start from the champion survey.
+  const toolOrder = guardContext
+    ? `1. get_champions?mode=summary — survey the full champion roster (id, name, cost, traitIds)
+2. If an anchor champion is specified → get_champions?mode=detail&names=[anchor] to read skillDesc and confirm carry role
+3. (Optional) get_traits?mode=info&trait_ids=[…] — read activation thresholds for synergies you are considering`
+    : `1. get_version — confirm the active game version name and id
+2. get_traits?mode=list — get all available synergy IDs for this version
+3. get_champions?mode=summary — survey the full champion roster (id, name, cost, traitIds)
+4. If an anchor champion is specified → get_champions?mode=detail&names=[anchor] to read skillDesc and confirm carry role`;
+
   return `You are the Planner (Propose phase) of a two-stage TFT team composition builder.
 Your job is to survey the champion pool and synergies, then PROPOSE 3 distinct strategy options (A, B, C) for the user to choose from.
 You do NOT fill unit slots — that is the Builder's job after the user selects an option.
-${versionSection}
+${versionSection}${guardSection}
 ## Mandatory Tool Call Order
 You MUST call tools in this exact order before producing output:
-1. get_version — confirm the active game version name and id
-2. get_traits?mode=list — get all available synergy IDs for this version
-3. get_champions?mode=summary — survey the full champion roster (id, name, cost, traitIds)
-4. If an anchor champion is specified → get_champions?mode=detail&names=[anchor] to read skillDesc and confirm carry role
+${toolOrder}
 
 ## CRITICAL: Trait ID Rules
-- All trait IDs in your options MUST come directly from the get_traits tool response
+- All trait IDs in your options MUST come from the verified trait list above (or the get_traits tool response if no list was provided)
 - NEVER guess or invent trait IDs — they change between game versions
 
 ## Rules
@@ -278,11 +291,12 @@ Output a single valid JSON object. No markdown. No extra text.
 // ── Answer agent ──────────────────────────────────────────────────────────────
 // Handles answer_question intent — no tools needed for most questions.
 export function buildAnswerPrompt(opts: AnswerPromptOptions): string {
-  const { versionName } = opts;
+  const { versionName, guardContext } = opts;
   const versionSection = versionName ? `\nCurrent game version: "${versionName}"\n` : "";
+  const guardSection = guardContext ? `\n${guardContext}\n` : "";
 
   return `You are Golden Spatula, an expert TFT (Teamfight Tactics) advisor.
-${versionSection}
+${versionSection}${guardSection}
 The user has asked a question about game mechanics, meta, synergies, items, or strategy.
 Answer concisely and helpfully. You may use the get_traits, get_champions, get_items, or get_augments tools if you need to look up specific current data, but for general questions answer directly from your knowledge.
 
@@ -320,22 +334,38 @@ Respond with a single JSON object. No markdown code blocks. No text outside the 
 }
 
 export function buildBuilderPrompt(opts: BuilderPromptOptions): string {
-  const { versionName, plannerOutput } = opts;
+  const { versionName, plannerOutput, guardContext, retryFeedback } = opts;
   const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+  const guardSection = guardContext ? `\n${guardContext}\n` : "";
+
+  // Retry feedback is surfaced at the very top so the model addresses it first.
+  const retrySection = retryFeedback
+    ? `\n## ⚠️ VALIDATION FAILURE — FIX THESE BEFORE ANYTHING ELSE\n${retryFeedback}\n`
+    : "";
+
+  // When the guard rail provided the verified trait list, Loop 0 verifies against
+  // that list instead of making a fresh get_traits?mode=list call.
+  const loop0 = guardContext
+    ? `### Loop 0 — Trait ID Verification (ALWAYS run first, no exceptions)
+1. The verified trait list is provided in the "Verified Game Context" section above.
+2. For each trait ID in targetSynergies and fallbackSynergies from the Planner's plan: verify it appears in that verified list.
+3. If a trait ID from the plan does NOT appear in the verified list → it is invalid for this version. Drop it and pick a replacement from the verified list.
+4. You MUST NOT proceed to Loop 1 until all synergy IDs are verified against the list.`
+    : `### Loop 0 — Trait ID Verification (ALWAYS run first, no exceptions)
+1. get_traits?mode=list — fetch the full trait list for this game version
+2. For each trait ID in targetSynergies and fallbackSynergies from the Planner's plan: verify it exists in the tool response
+3. If a trait ID from the plan does NOT appear in the tool response → it is invalid for this version. Drop it and pick a replacement from the traits returned by the tool.
+4. You MUST NOT proceed to Loop 1 until all synergy IDs are verified against this tool response.`;
 
   return `You are the Builder stage of a two-stage TFT team composition builder.
 You have received a strategic plan from the Planner. Your job is to construct a complete, validated 10-unit team composition through four sequential validation loops.
-${versionSection}
+${retrySection}${versionSection}${guardSection}
 ## Planner's Strategic Plan
 ${plannerOutput}
 
 ## Mandatory Four-Loop Workflow
 
-### Loop 0 — Trait ID Verification (ALWAYS run first, no exceptions)
-1. get_traits?mode=list — fetch the full trait list for this game version
-2. For each trait ID in targetSynergies and fallbackSynergies from the Planner's plan: verify it exists in the tool response
-3. If a trait ID from the plan does NOT appear in the tool response → it is invalid for this version. Drop it and pick a replacement from the traits returned by the tool.
-4. You MUST NOT proceed to Loop 1 until all synergy IDs are verified against this tool response.
+${loop0}
 
 ### Loop 1 — Pool Validation (run before filling any units)
 1. get_traits?mode=info&trait_ids=[verifiedTargetSynergies] — read actual activation thresholds
