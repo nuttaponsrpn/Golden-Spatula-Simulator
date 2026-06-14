@@ -186,7 +186,7 @@ export function useChatComposer(opts: ComposerOptions) {
   const aiProvider = useAiProvider();
   const history = useChatHistory(sessionId);
   const promptBuilder = useChatPromptBuilder();
-  const { champions: allChampions } = useTftData();
+  const { champions: allChampions } = useGsData();
   const { updateSession } = useChatSessions();
 
   const isStreaming = ref(false);

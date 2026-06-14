@@ -1,9 +1,9 @@
-// app/composables/tft/useItems.ts
-import { useTftData } from "./useTftData";
+// app/composables/gs/useItems.ts
+import { useGsData } from "./useGsData";
 import type { ItemCategory } from "~/types/item";
 
 export const useItems = () => {
-  const { items } = useTftData();
+  const { items } = useGsData();
 
   const categories: { value: ItemCategory; label: string }[] = [
     { value: "basic", label: "Components" },

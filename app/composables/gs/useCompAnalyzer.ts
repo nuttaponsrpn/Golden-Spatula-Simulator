@@ -1,10 +1,10 @@
 import type { PlacedUnits } from "~/types/team";
 import type { CompScore } from "~/types/comp";
-import { buildCompScore, buildSuggestions } from "~/utils/tft";
-import { useTftData } from "./useTftData";
+import { buildCompScore, buildSuggestions } from "~/utils/gs-scoring";
+import { useGsData } from "./useGsData";
 
 export function useCompAnalyzer() {
-  const { champions, traits } = useTftData();
+  const { champions, traits } = useGsData();
 
   const traitList = computed(() => Object.values(traits.value));
 

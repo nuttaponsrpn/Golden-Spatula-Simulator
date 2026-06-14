@@ -1,24 +1,24 @@
 import type { Champion, ChampionCost } from "~/types/champion";
-import { useTftData } from "./useTftData";
+import { useGsData } from "./useGsData";
 
 export function useChampions() {
-  const { champions } = useTftData();
+  const { champions } = useGsData();
 
-  const searchQuery = useState<string>("tft-champion-search", () => "");
+  const searchQuery = useState<string>("gs-champion-search", () => "");
   const selectedTraitId = useState<string | null>(
-    "tft-champion-trait-filter",
+    "gs-champion-trait-filter",
     () => null,
   );
   const selectedCost = useState<ChampionCost | null>(
-    "tft-champion-cost-filter",
+    "gs-champion-cost-filter",
     () => null,
   );
   const selectedClassId = useState<string | null>(
-    "tft-champion-class-filter",
+    "gs-champion-class-filter",
     () => null,
   );
   const selectedOriginId = useState<string | null>(
-    "tft-champion-origin-filter",
+    "gs-champion-origin-filter",
     () => null,
   );
 

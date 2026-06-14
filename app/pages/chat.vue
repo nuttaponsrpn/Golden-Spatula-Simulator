@@ -146,7 +146,7 @@ definePageMeta({ ssr: false });
 useHead({ title: "Chat — Golden Spatula Simulator" });
 
 const route = useRoute();
-const { champions, items, init } = useTftData();
+const { champions, items, init } = useGsData();
 const { loadUnits } = useTeamBuilder();
 const { sessions, loadSessions, createSession, updateSession, deleteSession } = useChatSessions();
 const { showError } = useErrorHandler();

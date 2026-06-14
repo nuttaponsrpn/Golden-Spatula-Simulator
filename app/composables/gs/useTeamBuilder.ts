@@ -8,7 +8,7 @@ const BOARD_COLS = 7;
 const MAX_UNITS = 10;
 
 export function useTeamBuilder() {
-  const teamUnits = useState<PlacedUnits>("tft-team-units", () => []);
+  const teamUnits = useState<PlacedUnits>("gs-team-units", () => []);
 
   const unitCount = computed(() => teamUnits.value.length);
   const isBoardFull = computed(() => teamUnits.value.length >= MAX_UNITS);

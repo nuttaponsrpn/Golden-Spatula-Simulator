@@ -1,4 +1,4 @@
-// server/api/tft/data.get.ts
+// server/api/gs/data.get.ts
 import { defineEventHandler } from 'h3';
 
 export default defineEventHandler(async (event) => {
@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     throw createError({
       statusCode: 500,
-      statusMessage: 'Failed to fetch external TFT data',
+      statusMessage: 'Failed to fetch Golden Spatula game data',
       data: error.message
     });
   }

@@ -80,9 +80,9 @@
 
 <script setup lang="ts">
 import type { ChampionCost } from "~/types/champion";
-import { useChampions } from "~/composables/tft/useChampions";
-import { useSynergies } from "~/composables/tft/useSynergies";
-import { useDragDrop } from "~/composables/tft/useDragDrop";
+import { useChampions } from "~/composables/gs/useChampions";
+import { useSynergies } from "~/composables/gs/useSynergies";
+import { useDragDrop } from "~/composables/gs/useDragDrop";
 
 defineProps<{
   isBoardFull: boolean;

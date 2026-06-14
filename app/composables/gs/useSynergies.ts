@@ -1,11 +1,11 @@
 import type { Trait, SynergyActivation } from "~/types/trait";
 import type { PlacedUnits } from "~/types/team";
-import { useTftData } from "./useTftData";
+import { useGsData } from "./useGsData";
 import { useChampions } from "./useChampions";
-import { calculateSynergyActivations } from "~/utils/tft";
+import { calculateSynergyActivations } from "~/utils/gs-scoring";
 
 export function useSynergies() {
-  const { traits } = useTftData();
+  const { traits } = useGsData();
   const { champions } = useChampions();
 
   const traitList = computed(() => Object.values(traits.value));

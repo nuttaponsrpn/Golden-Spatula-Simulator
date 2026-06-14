@@ -61,7 +61,7 @@
 <script setup lang="ts">
 import type { TeamBoard, BoardPosition } from "~/types/team";
 import type { Item } from "~/types/item";
-import { useItems } from "~/composables/tft/useItems";
+import { useItems } from "~/composables/gs/useItems";
 
 const props = defineProps<{
   board: TeamBoard;

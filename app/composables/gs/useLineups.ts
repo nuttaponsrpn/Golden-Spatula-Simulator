@@ -1,8 +1,8 @@
-// app/composables/tft/useLineups.ts
-import { useTftData } from "./useTftData";
+// app/composables/gs/useLineups.ts
+import { useGsData } from "./useGsData";
 
 export const useLineups = () => {
-  const { lineups } = useTftData();
+  const { lineups } = useGsData();
 
   const byQuality = (q: "S" | "A" | "B" | "C") =>
     computed(() => lineups.value.filter((l) => l.quality === q));

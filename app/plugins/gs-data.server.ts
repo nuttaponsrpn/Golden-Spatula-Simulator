@@ -1,8 +1,8 @@
-// app/plugins/tft-data.server.ts
-import { useTftData } from "~/composables/tft/useTftData";
+// app/plugins/gs-data.server.ts
+import { useGsData } from "~/composables/gs/useGsData";
 
 export default defineNuxtPlugin(async () => {
-  const { init, initialized } = useTftData();
+  const { init, initialized } = useGsData();
   if (!initialized.value) {
     console.log("[TFT Data] Starting server-side initialization...");
     const result = await init();

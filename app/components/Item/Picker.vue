@@ -103,8 +103,8 @@
 
 <script setup lang="ts">
 import type { Item } from "~/types/item";
-import { useItems } from "~/composables/tft/useItems";
-import { useDragDrop } from "~/composables/tft/useDragDrop";
+import { useItems } from "~/composables/gs/useItems";
+import { useDragDrop } from "~/composables/gs/useDragDrop";
 
 const TOOLTIP_WIDTH = 288; // w-72
 const TOOLTIP_OFFSET = 8;

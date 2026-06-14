@@ -6,7 +6,7 @@ import { createGeminiProvider } from "./providers/gemini";
 import { createGeminiDefaultProvider } from "./providers/gemini-default";
 import { createCopilotProvider } from "./providers/copilot";
 
-const LOCAL_STORAGE_KEY = "tft-ai-provider-config";
+const LOCAL_STORAGE_KEY = "gs-ai-provider-config";
 
 function makeProvider(config: AiProviderConfig): AiProvider {
   switch (config.kind) {

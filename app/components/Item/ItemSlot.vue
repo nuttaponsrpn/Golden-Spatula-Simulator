@@ -58,7 +58,7 @@ const onDragLeave = () => {
 const onDrop = (event: DragEvent) => {
   isOver.value = false;
 
-  const raw = event.dataTransfer?.getData("application/tft-drag");
+  const raw = event.dataTransfer?.getData("application/gs-drag");
   if (!raw) return;
 
   try {

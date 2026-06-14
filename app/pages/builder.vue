@@ -3,7 +3,7 @@
     <div
       class="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"
     ></div>
-    <p class="text-gray-400 font-medium">กำลังโหลดข้อมูล TFT...</p>
+    <p class="text-gray-400 font-medium">กำลังโหลดข้อมูล Golden Spatula...</p>
   </div>
 
   <div
@@ -192,7 +192,7 @@ const {
   isChampionOnBoard,
 } = useTeamBuilder();
 
-const { loading, initialized, init } = useTftData();
+const { loading, initialized, init } = useGsData();
 const { analyzeComp, getSuggestions } = useCompAnalyzer();
 const { getChampionById } = useChampions();
 const { getSynergyActivations } = useSynergies();

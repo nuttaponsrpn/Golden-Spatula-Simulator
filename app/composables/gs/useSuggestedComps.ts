@@ -1,8 +1,8 @@
 import type { SuggestedComp } from "~/types/comp";
-import { useTftData } from "./useTftData";
+import { useGsData } from "./useGsData";
 
 export function useSuggestedComps() {
-  const { lineups } = useTftData();
+  const { lineups } = useGsData();
 
   function getCompById(id: string): SuggestedComp | undefined {
     return lineups.value.find((c) => c.id === id);

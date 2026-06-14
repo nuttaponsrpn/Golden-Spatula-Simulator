@@ -1,4 +1,4 @@
-// app/composables/tft/useTftData.ts
+// app/composables/gs/useGsData.ts
 import { useState } from "#app";
 import type { Champion } from "~/types/champion";
 import type { Trait } from "~/types/trait";
@@ -18,32 +18,32 @@ import type { ApiRawTraitResponse } from "~/types/api-raw/trait";
 import type { ApiRawEquipResponse } from "~/types/api-raw/equip";
 import type { ApiRawLineupResponse } from "~/types/api-raw/lineup";
 
-export const useTftData = () => {
-  const champions = useState<Champion[]>("tft-champions", () => []);
-  const traits = useState<Record<string, Trait>>("tft-traits", () => ({}));
-  const items = useState<Item[]>("tft-items", () => []);
-  const lineups = useState<SuggestedComp[]>("tft-lineups", () => []);
-  const loading = useState<boolean>("tft-loading", () => false);
-  const initialized = useState<boolean>("tft-initialized", () => false);
+export const useGsData = () => {
+  const champions = useState<Champion[]>("gs-champions", () => []);
+  const traits = useState<Record<string, Trait>>("gs-traits", () => ({}));
+  const items = useState<Item[]>("gs-items", () => []);
+  const lineups = useState<SuggestedComp[]>("gs-lineups", () => []);
+  const loading = useState<boolean>("gs-loading", () => false);
+  const initialized = useState<boolean>("gs-initialized", () => false);
 
   const init = async () => {
     if (initialized.value) return { status: "success" };
 
     loading.value = true;
     try {
-      if (import.meta.dev) console.log("[TFT Data] Initializing data via proxy...");
+      if (import.meta.dev) console.log("[GS Data] Initializing data via proxy...");
 
       const response = await $fetch<{
         chess: ApiRawChessResponse;
         trait: ApiRawTraitResponse;
         equip: ApiRawEquipResponse;
         lineup: ApiRawLineupResponse;
-      }>("/api/tft/data");
+      }>("/api/gs/data");
 
       const { chess: chessData, trait: traitData, equip: equipData, lineup: lineupData } = response;
 
       if (import.meta.dev) {
-        console.log("[TFT Data] Fetched data from proxy:", {
+        console.log("[GS Data] Fetched data from proxy:", {
           chess: !!chessData?.data,
           trait: !!traitData?.data,
           equip: !!equipData?.data,
@@ -52,7 +52,7 @@ export const useTftData = () => {
       }
 
       if (!chessData?.data || !traitData?.data || !equipData?.data || !lineupData?.lineup_list) {
-        throw new Error("[TFT Data] One or more required data fields are missing from Proxy response");
+        throw new Error("[GS Data] One or more required data fields are missing from Proxy response");
       }
 
       // 1. Transform traits first (needed for champion trait validation)
@@ -67,15 +67,15 @@ export const useTftData = () => {
       // 2. Transform champions
       const traitCheckIds = new Set(Object.keys(traitMap));
       const championMap: Record<string, Champion> = {};
-      
+
       Object.values(chessData.data).forEach((raw) => {
         // กรองเอาเฉพาะตัวที่ระบุว่าให้โชว์ (showHeroTag === "1") และเป็นฮีโร่จริง
         // ตรวจสอบว่า class มีค่าและไม่ใช่ -1 (รวมถึงกรณี -1|-1)
         const hasValidClass = raw.class && raw.class.split("|").some(id => id !== "-1" && id !== "");
-        
+
         if (raw.heroType === "0" && hasValidClass && (raw.showHeroTag === "1" || !championMap[raw.name])) {
           const champion = toChampion(raw, traitCheckIds);
-          
+
           // ตรวจสอบว่าหลังจากผ่าน adapter แล้วมี trait จริงๆ (เพื่อกรองพวกตัวประหลาดหรือมอนสเตอร์ออก)
           if (champion.traits.length > 0) {
             // ถ้ายังไม่มีชื่อนี้ใน Map หรือตัวใหม่มี showHeroTag=1 ขณะที่ตัวเก่าไม่มี
@@ -85,7 +85,7 @@ export const useTftData = () => {
           }
         }
       });
-      
+
       champions.value = Object.values(championMap)
         .sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name));
 
@@ -105,11 +105,11 @@ export const useTftData = () => {
         .map(toSuggestedComp)
         .filter((comp): comp is SuggestedComp => comp !== null);
 
-      if (import.meta.dev) console.log("[TFT Data] Transformation complete.");
+      if (import.meta.dev) console.log("[GS Data] Transformation complete.");
       initialized.value = true;
       return { status: "success" };
     } catch (e) {
-      console.error("[TFT Data] Initialization failed via proxy:", e);
+      console.error("[GS Data] Initialization failed via proxy:", e);
       initialized.value = false;
       return { status: "error", error: normalizeError(e) };
     } finally {

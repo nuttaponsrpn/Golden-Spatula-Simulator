@@ -32,7 +32,7 @@ const emit = defineEmits<{
 const { isDraggingUnit } = useDragDrop();
 const isOver = ref(false);
 
-const DRAG_DATA_KEY = "application/tft-drag";
+const DRAG_DATA_KEY = "application/gs-drag";
 
 function onDragEnter(): void {
   isOver.value = true;

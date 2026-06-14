@@ -2,18 +2,18 @@ import type { BoardPosition } from "~/types/team";
 import type { DragPayload, DragSourceKind } from "~/types/drag";
 import type { Item } from "~/types/item";
 
-const DRAG_DATA_KEY = "application/tft-drag";
+const DRAG_DATA_KEY = "application/gs-drag";
 
 export function useDragDrop() {
   const { addUnit, moveUnit, swapUnits, board, addItemToUnit } = useTeamBuilder();
   const { items: allItems } = useItems();
   const dragOverPosition = useState<BoardPosition | null>(
-    "tft-drag-over-position",
+    "gs-drag-over-position",
     () => null,
   );
-  const isDraggingUnit = useState<boolean>("tft-is-dragging-unit", () => false);
-  const isDragging = useState<boolean>("tft-is-dragging", () => false);
-  const draggingUnitId = useState<string | null>("tft-dragging-unit-id", () => null);
+  const isDraggingUnit = useState<boolean>("gs-is-dragging-unit", () => false);
+  const isDragging = useState<boolean>("gs-is-dragging", () => false);
+  const draggingUnitId = useState<string | null>("gs-dragging-unit-id", () => null);
 
   if (import.meta.client) {
     watchEffect(() => {

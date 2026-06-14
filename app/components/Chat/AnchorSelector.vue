@@ -84,7 +84,7 @@ const emit = defineEmits<{
   skip: [];
 }>();
 
-const { champions } = useTftData();
+const { champions } = useGsData();
 const searchQuery = ref("");
 
 const filteredChampions = computed(() => {
