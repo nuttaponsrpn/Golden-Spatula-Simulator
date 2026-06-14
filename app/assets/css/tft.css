@@ -12,6 +12,22 @@
   --tier-prismatic: #b388ff;
 }
 
+/* ── Lock the document to the viewport so only internal regions scroll ──
+   On mobile, a scrollable document lets the browser show/hide its address bar
+   as you scroll, which resizes 100dvh and makes fixed headers/footers appear
+   to drift. Pinning html/body and disabling overscroll chaining keeps the
+   app shell stable so the chat header/composer stay put. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+#__nuxt {
+  height: 100%;
+}
+
 /* ── Drag cursor override — applied to body via useDragDrop ── */
 body.is-dragging,
 body.is-dragging * {

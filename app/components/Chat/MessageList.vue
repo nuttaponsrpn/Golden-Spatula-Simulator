@@ -1,7 +1,7 @@
 <template>
   <div
     ref="listRef"
-    class="flex flex-col gap-4 overflow-y-auto p-4"
+    class="flex flex-col gap-4 overflow-y-auto overscroll-contain p-4"
     data-testid="chat-message-list"
   >
     <ChatMessageBubble
