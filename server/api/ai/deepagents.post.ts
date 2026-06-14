@@ -12,6 +12,8 @@ import {
   setResponseHeaders,
 } from "h3";
 import { createGsTools } from "~/utils/gs-tools";
+import { fetchVersionByMode } from "../../utils/gsVersion";
+import { buildPlannerPrompt, buildBuilderPrompt } from "../../utils/gsPromptBuilder";
 
 // Allow up to 300s on Vercel Pro (long-running AI response)
 export const maxDuration = 300;
@@ -20,6 +22,7 @@ interface DeepAgentsRequestBody {
   messages: { role: "user" | "assistant"; content: string }[];
   systemPrompt: string;
   activeMode?: string;
+  anchorChampions?: { id: string; name: string }[];
 }
 
 interface ToolCallStreamLike {
@@ -44,25 +47,30 @@ export default defineEventHandler(async (event) => {
 
   const body = await readBody<DeepAgentsRequestBody>(event);
 
+  // Use absolute internal URL so $fetch in gs-tools resolves correctly on the server
+  const host = getRequestHost(event, { xForwardedHost: false });
+  const protocol = event.node.req.socket && "encrypted" in event.node.req.socket ? "https" : "http";
+  const apiBase = `${protocol}://${host}`;
+  const tools = createGsTools(apiBase, body.activeMode);
+
+  // ── Stage 0: Version Bootstrap ──────────────────────────────────────────
+  // Resolve the version name for context so prompts can reference it.
+  let versionName: string | undefined;
+  try {
+    const version = await fetchVersionByMode(body.activeMode ?? "17");
+    versionName = version.name;
+  } catch {
+    // Non-fatal — prompts work without a version name
+  }
+
+  // Anchor champions from the client (already resolved by the UI)
+  const anchorChampions = (body.anchorChampions ?? []) as { id: string; name: string }[];
+
   const lcMessages = body.messages.map((m) =>
     m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content),
   );
 
-  // Use absolute internal URL so $fetch in gs-tools resolves correctly on the server
-  const host = getRequestHost(event, { xForwardedHost: false });
-  const protocol = event.node.req.socket && "encrypted" in event.node.req.socket ? "https" : "http";
-  const tools = createGsTools(`${protocol}://${host}`, body.activeMode);
-
-  const agent = createDeepAgent({
-    model: "google-genai:gemini-2.5-pro",
-    tools,
-    systemPrompt: body.systemPrompt,
-    permissions: [],
-  });
-
-  const run = await agent.streamEvents({ messages: lcMessages }, { version: "v3" });
-
-  // Use Web ReadableStream (required for Vercel — Node.js Readable doesn't stream properly)
+  // ── SSE stream setup ────────────────────────────────────────────────────
   const encoder = new TextEncoder();
   let streamController: ReadableStreamDefaultController<Uint8Array> | null = null;
 
@@ -88,10 +96,9 @@ export default defineEventHandler(async (event) => {
     streamController = null;
   }
 
-  // Tool calls — iterate run.toolCalls (registered by createToolCallTransformer in ReactAgent.compile)
-  // Cast needed because TypeScript loses the concrete TTools generic after createDeepAgent
-  const runAny = run as unknown as { toolCalls?: AsyncIterable<ToolCallStreamLike> };
-  if (runAny.toolCalls) {
+  function wireToolCallEvents(run: unknown): void {
+    const runAny = run as { toolCalls?: AsyncIterable<ToolCallStreamLike> };
+    if (!runAny.toolCalls) return;
     (async () => {
       for await (const call of runAny.toolCalls!) {
         const [output, status] = await Promise.all([
@@ -109,16 +116,103 @@ export default defineEventHandler(async (event) => {
     })().catch((err) => console.error("[deepagents] toolCalls error:", err));
   }
 
-  // Message token streaming — uses run.messages projection (higher-level, works across all models)
+  // ── Main pipeline ────────────────────────────────────────────────────────
   (async () => {
+    const t0 = Date.now();
+    const elapsed = () => `+${((Date.now() - t0) / 1000).toFixed(1)}s`;
+
     try {
-      for await (const msg of run.messages) {
+      // ── Stage 1: Planner ───────────────────────────────────────────────
+      console.log(`[deepagents][${elapsed()}] stage:planner — createDeepAgent`);
+      pushEvent("stage", { stage: "planner", label: "วิเคราะห์ทีม..." });
+
+      const plannerPrompt = buildPlannerPrompt({
+        versionName,
+        anchorChampions,
+      });
+
+      const plannerAgent = createDeepAgent({
+        model: "google-genai:gemini-2.5-pro",
+        tools,
+        systemPrompt: plannerPrompt,
+        permissions: [],
+      });
+
+      console.log(`[deepagents][${elapsed()}] planner — calling streamEvents`);
+      const plannerRun = await plannerAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
+      console.log(`[deepagents][${elapsed()}] planner — streamEvents returned, iterating messages`);
+      const plannerRunAny = plannerRun as unknown as Record<string, unknown>;
+      console.log(`[deepagents] plannerRun keys:`, Object.keys(plannerRunAny));
+      console.log(`[deepagents] plannerRun.messages type:`, typeof plannerRunAny.messages);
+      console.log(`[deepagents] plannerRun.messages value:`, plannerRunAny.messages);
+      for (const key of Object.keys(plannerRunAny)) {
+        const val = plannerRunAny[key];
+        const isAsyncIter = val != null && typeof (val as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === "function";
+        console.log(`[deepagents]   .${key} → type:${typeof val}, isAsyncIterable:${isAsyncIter}`);
+      }
+      wireToolCallEvents(plannerRun);
+
+      // Collect the full planner text output before starting the Builder
+      let plannerOutput = "";
+      let plannerMsgCount = 0;
+      for await (const msg of plannerRun.messages) {
+        plannerMsgCount++;
+        const msgAny = msg as unknown as Record<string, unknown>;
+        console.log(`[deepagents][${elapsed()}] planner — msg #${plannerMsgCount} node:${String(msgAny.node)} namespace:${JSON.stringify(msgAny.namespace)}`);
+        let tokenCount = 0;
         for await (const token of msg.text) {
-          if (token) pushEvent("token", token);
+          if (token) {
+            plannerOutput += token;
+            tokenCount++;
+            if (tokenCount === 1) console.log(`[deepagents][${elapsed()}] planner — FIRST TOKEN in msg #${plannerMsgCount}`);
+            // Planner output is internal JSON — do not stream to client
+          }
+        }
+        console.log(`[deepagents][${elapsed()}] planner — msg #${plannerMsgCount} done (tokens: ${tokenCount})`);
+      }
+      console.log(`[deepagents][${elapsed()}] planner — messages loop DONE (total msgs: ${plannerMsgCount})`);
+      console.log(`[deepagents][${elapsed()}] planner — awaiting run.output...`);
+      const plannerFinalState = await (plannerRun as unknown as { output: Promise<unknown> }).output;
+      console.log(`[deepagents][${elapsed()}] planner — run.output resolved:`, JSON.stringify(plannerFinalState).slice(0, 500));
+
+      // ── Stage 2: Builder ───────────────────────────────────────────────
+      console.log(`[deepagents][${elapsed()}] stage:builder — createDeepAgent`);
+      pushEvent("stage", { stage: "builder", label: "สร้างทีม..." });
+
+      const builderPrompt = buildBuilderPrompt({
+        versionName,
+        plannerOutput,
+      });
+
+      const builderAgent = createDeepAgent({
+        model: "google-genai:gemini-2.5-pro",
+        tools,
+        systemPrompt: builderPrompt,
+        permissions: [],
+      });
+
+      console.log(`[deepagents][${elapsed()}] builder — calling streamEvents`);
+      // Builder receives planner output as the user message — Gemini requires at least one content item
+      const builderMessages = [new HumanMessage(plannerOutput || "สร้างทีม TFT ตามแผนที่วางไว้")];
+      const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
+      console.log(`[deepagents][${elapsed()}] builder — streamEvents returned, iterating messages`);
+      wireToolCallEvents(builderRun);
+
+      // Stream builder tokens to the client
+      let builderTokenCount = 0;
+      for await (const msg of builderRun.messages) {
+        console.log(`[deepagents][${elapsed()}] builder — new message chunk`);
+        for await (const token of msg.text) {
+          if (token) {
+            builderTokenCount++;
+            if (builderTokenCount === 1) console.log(`[deepagents][${elapsed()}] builder — FIRST TOKEN received`);
+            pushEvent("token", token);
+          }
         }
       }
+      console.log(`[deepagents][${elapsed()}] builder — COMPLETE (total tokens: ${builderTokenCount})`);
     } catch (err) {
-      console.error("[deepagents] stream error:", err);
+      console.error("[deepagents] pipeline error:", err);
       const errMsg = err instanceof Error ? err.message : String(err);
       pushEvent("error", { message: errMsg });
     } finally {

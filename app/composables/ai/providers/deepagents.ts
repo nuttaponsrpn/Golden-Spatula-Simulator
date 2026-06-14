@@ -13,7 +13,12 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
       const response = await fetch("/api/ai/deepagents", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages, systemPrompt, activeMode: opts?.activeMode }),
+        body: JSON.stringify({
+          messages,
+          systemPrompt,
+          activeMode: opts?.activeMode,
+          anchorChampions: opts?.anchorChampions,
+        }),
         signal: opts?.signal,
       });
 
@@ -44,6 +49,8 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
               const event = JSON.parse(raw) as { type: string; payload: unknown };
               if (event.type === "token" && typeof event.payload === "string") {
                 if (event.payload) yield event.payload;
+              } else if (event.type === "stage" && opts?.onStage) {
+                opts.onStage(event.payload as { stage: string; label: string });
               } else if (event.type === "tool_call" && opts?.onToolCall) {
                 opts.onToolCall(event.payload as ToolCallStep);
               } else if (event.type === "error") {

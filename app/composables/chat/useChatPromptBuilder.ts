@@ -8,6 +8,16 @@ interface PromptOptions {
   versionName?: string;
 }
 
+interface PlannerOptions {
+  versionName?: string;
+  anchorChampions?: Champion[];
+}
+
+interface BuilderOptions {
+  versionName?: string;
+  plannerOutput: string;
+}
+
 const RESPONSE_FORMAT = `## Response Format
 ALWAYS respond with a single JSON object. No markdown code blocks. No text outside the JSON.
 
@@ -85,8 +95,69 @@ Examples that should trigger this recommendation:
 Wording example (in Thai):
 "คำขอนี้แตกต่างจากทีมที่เราคุยกันมาก ขอแนะนำให้เปิด Chat ใหม่เพื่อความแม่นยำในการสร้างทีมครับ 😊"`;
 
+// ─── Planner output schema (what the Planner MUST return as JSON) ───────────
+const PLANNER_OUTPUT_SCHEMA = `## Planner Output Schema
+You MUST output a single valid JSON object matching this schema EXACTLY. No markdown code blocks. No extra text.
+
+{
+  "carry": {
+    "id": "champion_id_from_tool",
+    "name": "Champion Name",
+    "cost": 4,
+    "damageType": "physical | magic | hybrid",
+    "role": "AD_Carry | AP_Carry | Tank | Utility"
+  },
+  "targetSynergies": ["trait_id_1", "trait_id_2"],
+  "fallbackSynergies": ["trait_id_3", "trait_id_4"],
+  "costCurve": { "1cost": 2, "2cost": 3, "3cost": 3, "4cost": 2 }
+}
+
+Rules:
+- carry.id and all trait IDs MUST come directly from tool responses — never invent IDs
+- targetSynergies: 2–3 primary synergy IDs to activate
+- fallbackSynergies: 2–3 backup synergy IDs in case primary pools are too small
+- costCurve values must sum to exactly 10
+- Do NOT include unit slot assignments — that is the Builder's job`;
+
+// ─── Builder final output schema (what the Builder MUST return) ──────────────
+const BUILDER_OUTPUT_SCHEMA = `## Builder Output Schema
+You MUST output a single valid JSON object. No markdown code blocks. No text outside the JSON.
+
+{
+  "title": "Short session title (5-8 words in Thai)",
+  "text": "explanation and playstyle strategy in plain text",
+  "comp": {
+    "explanation": "2-3 sentences explaining why this comp works",
+    "playstyle": "early/mid/late game strategy",
+    "synergyReasoning": "Which thresholds are activated and what each bonus does",
+    "itemReasoning": "Why each item was chosen for its carrier",
+    "activatedSynergies": [
+      { "traitId": "trait_id", "count": 5, "threshold": 5 }
+    ],
+    "units": [
+      {
+        "championId": "exact_id_from_tool",
+        "stars": 2,
+        "items": ["exact_item_id_from_tool"],
+        "isCarry": true,
+        "position": { "row": 3, "col": 3 },
+        "reason": "1 sentence: role + synergy this unit activates",
+        "sourceToolCall": "loop identifier, e.g. get_champions#loop2"
+      }
+    ]
+  }
+}
+
+Validation rules — the output is INVALID and must be regenerated if any of these fail:
+- units array MUST contain EXACTLY 10 entries
+- All championId values MUST come directly from get_champions tool responses
+- All item id values MUST come directly from get_items tool responses
+- Every activated synergy count MUST be ≥ its threshold
+- carry unit MUST have 2–3 items assigned
+- sourceToolCall MUST be present on every unit and item entry`;
+
 export function useChatPromptBuilder() {
-  // Used by Claude / Gemini / Copilot — embeds full roster in the prompt
+  // ── Used by Claude / Gemini / Copilot — embeds full roster in the prompt ──
   function buildSystemPrompt(opts: PromptOptions): string {
     const { anchorChampions, allChampions, allItems, versionName } = opts;
 
@@ -127,7 +198,7 @@ ${CLARIFICATION_PROTOCOL}
 ${RESPONSE_FORMAT}`;
   }
 
-  // Used by DeepAgents — NO embedded roster; agent must call tools to fetch live data
+  // ── Used by DeepAgents (single-stage, legacy) — agent fetches live data via tools ──
   function buildDeepAgentsSystemPrompt(anchorChampions: Champion[], versionName?: string): string {
     const anchorSection =
       anchorChampions.length > 0
@@ -144,21 +215,97 @@ You have access to live data tools. You MUST call them before answering any comp
 Do NOT use training knowledge for champion IDs, item IDs, or trait data — always fetch from tools first.
 
 Available tools:
-- **get_champions** — fetches all champions with their id, name, cost, and traits. ALWAYS call this before building a comp.
-- **get_traits** — fetches all traits with activation thresholds. Call this to verify synergy breakpoints.
-- **get_items** — fetches all items. Call this to get exact item IDs before outputting a comp.
-- **get_lineups** — fetches pre-built meta team compositions. Call this when the user asks for the current meta.
+- **get_champions** — fetches champions. Use mode='summary' for discovery, mode='detail' for full stats.
+- **get_traits** — fetches synergies. Use mode='list' for discovery, mode='info' for thresholds.
+- **get_items** — fetches items. Use mode='summary' for discovery, mode='detail' for full stats.
+- **get_augments** — fetches augments. Use mode='summary' for discovery, mode='detail' for descriptions.
+- **get_lineups** — fetches pre-built meta comps. Call only when user explicitly asks for meta.
 
 Required tool call order for composition requests:
-1. Call get_champions to get the full champion roster and their exact IDs
-2. Call get_traits to understand synergy thresholds
-3. Call get_items to get item IDs
-4. Then build the composition using ONLY the IDs returned by these tool calls
+1. get_champions?mode=summary — survey the full roster
+2. get_traits?mode=list — survey all synergies
+3. get_traits?mode=info&trait_ids=[…] — read activation thresholds for chosen synergies
+4. get_champions?mode=detail&trait_ids=[…] — fill unit slots
+5. get_items?mode=detail&recommend_for_role=[role] — assign items to carry
+6. Build composition using ONLY IDs returned by these tool calls
 ${anchorSection}
 ${CLARIFICATION_PROTOCOL}
 
 ${RESPONSE_FORMAT}`;
   }
 
-  return { buildSystemPrompt, buildDeepAgentsSystemPrompt };
+  // ── Stage 1: Planner Agent ────────────────────────────────────────────────
+  // Surveys champion pool and synergies → outputs a structured plan JSON.
+  // Does NOT fill unit slots — that is the Builder's responsibility.
+  function buildPlannerPrompt(opts: PlannerOptions): string {
+    const { versionName, anchorChampions = [] } = opts;
+    const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+
+    const anchorSection =
+      anchorChampions.length > 0
+        ? `\n## Anchor Champions (MUST be the carry or included in every comp)\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
+        : "";
+
+    return `You are the Planner stage of a two-stage TFT team composition builder.
+Your ONLY job is to analyse the available champion pool and synergy data, then output a structured strategic plan.
+You do NOT fill unit slots — that is the Builder's job.
+${versionSection}
+## Mandatory Tool Call Order
+You MUST call tools in this exact order before producing output:
+1. get_champions?mode=summary — survey the full champion roster (id, name, cost, traitIds)
+2. get_traits?mode=list — survey all available synergies (id, name, type)
+3. If an anchor champion is specified → get_champions?mode=detail&names=[anchor] to read skillDesc and determine damage type (physical / magic / hybrid) and correct carry role
+
+## Rules
+- Do NOT call get_lineups — derive strategy purely from champion pool and synergy data
+- Do NOT output unit IDs — produce strategy only
+- targetSynergies must be achievable: pick synergies where the champion pool has enough units to meet the lowest activation threshold
+- Include fallbackSynergies so the Builder can recover if a primary synergy pool is unexpectedly small
+- If an anchor champion is set, set it as carry unconditionally; read its skillDesc to determine role
+${anchorSection}
+${PLANNER_OUTPUT_SCHEMA}`;
+  }
+
+  // ── Stage 2: Builder Agent ────────────────────────────────────────────────
+  // Receives the Planner's plan and constructs a complete validated 10-unit comp.
+  function buildBuilderPrompt(opts: BuilderOptions): string {
+    const { versionName, plannerOutput } = opts;
+    const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+
+    return `You are the Builder stage of a two-stage TFT team composition builder.
+You have received a strategic plan from the Planner. Your job is to construct a complete, validated 10-unit team composition through three sequential validation loops.
+${versionSection}
+## Planner's Strategic Plan
+${plannerOutput}
+
+## Mandatory Three-Loop Workflow
+
+### Loop 1 — Pool Validation (run before filling any units)
+1. get_traits?mode=info&trait_ids=[targetSynergies] — read actual activation thresholds
+2. get_champions?mode=summary&trait_ids=[targetSynergies] — count units available per synergy
+3. If pool count < lowest threshold for a synergy → drop it, replace with next fallbackSynergy, repeat
+
+### Loop 2 — Unit Fill
+1. get_champions?mode=detail&trait_ids=[confirmedSynergies] — fetch full unit data
+2. Fill 10 slots following the Planner's costCurve
+3. Validate before proceeding:
+   - Exactly 10 units, all unique IDs
+   - Every confirmed synergy count ≥ its activation threshold
+   - All IDs come directly from this tool response (record sourceToolCall: "get_champions#loop2")
+
+### Loop 3 — Item Assignment
+1. get_champions?mode=detail&names=[carry.name] — confirm skillDesc and damage type
+2. get_items?mode=detail&recommend_for_role=[carry.role] — fetch role-matched items
+3. Assign 2–3 items to the carry. Assign 1 item to the strongest secondary unit if slots remain.
+4. All item IDs must come from the tool response (record sourceToolCall: "get_items#loop3")
+
+## Rules
+- Do NOT output a comp until all three loops are complete
+- Do NOT invent champion IDs or item IDs — every ID must trace back to a tool response
+- If Loop 1 exhausts all fallbackSynergies without finding a valid pool, return a clarification request instead of a partial comp
+
+${BUILDER_OUTPUT_SCHEMA}`;
+  }
+
+  return { buildSystemPrompt, buildDeepAgentsSystemPrompt, buildPlannerPrompt, buildBuilderPrompt };
 }
