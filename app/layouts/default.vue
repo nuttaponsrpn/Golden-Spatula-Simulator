@@ -1,5 +1,5 @@
 <template>
-  <div class="min-h-screen overflow-x-hidden bg-gray-950 text-gray-100">
+  <div class="h-dvh flex flex-col overflow-hidden bg-gray-950 text-gray-100">
     <nav class="border-b border-gray-800 bg-gray-900 px-4 py-3">
       <div class="mx-auto flex max-w-screen-xl items-center justify-between">
         <div class="flex items-center gap-4">
@@ -77,8 +77,10 @@
       </div>
     </nav>
 
-    <main class="mx-auto max-w-screen-xl px-4 py-6">
-      <slot />
+    <main class="flex-1 min-h-0 overflow-hidden">
+      <div class="mx-auto max-w-screen-xl px-4 py-6 h-full overflow-y-auto">
+        <slot />
+      </div>
     </main>
 
     <div
