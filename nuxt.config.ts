@@ -71,10 +71,10 @@ export default defineNuxtConfig({
         "/api/ai/deepagents": { maxDuration: 300 },
       },
     },
-    // Force nitro to include packages that langchain imports dynamically
-    // (not detectable via static analysis → would be missing from Vercel bundle)
+    // Force Vercel's file tracer to include packages that langchain imports dynamically
+    // (dynamic require → not detectable by static analysis → excluded from deployment)
     externals: {
-      inline: ["@langchain/google-genai"],
+      traceInclude: ["@langchain/google-genai"],
     },
   },
 });
