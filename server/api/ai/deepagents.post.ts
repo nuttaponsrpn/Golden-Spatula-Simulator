@@ -241,6 +241,81 @@ export default defineEventHandler(async (event) => {
     return output;
   }
 
+  // Errors worth one retry: Gemini occasionally returns a candidate with no
+  // content parts (safety filter, MAX_TOKENS, or an empty turn), which makes
+  // langchain throw "Cannot read properties of undefined (reading 'parts')".
+  // These are transient — a fresh run usually succeeds.
+  function isRecoverableModelError(err: unknown): boolean {
+    const msg = err instanceof Error ? err.message : String(err);
+    return (
+      /reading 'parts'/.test(msg) ||
+      /\bparts\b/.test(msg) ||
+      /candidate/i.test(msg) ||
+      /SAFETY|RECITATION|MAX_TOKENS|finishReason/i.test(msg) ||
+      /\b5\d\d\b/.test(msg) || // upstream 5xx
+      /overloaded|unavailable|rate.?limit|deadline|timeout/i.test(msg)
+    );
+  }
+
+  // Friendly message shown to the user when a stage fails terminally, instead
+  // of leaking a raw library exception like "...reading 'parts'".
+  const FRIENDLY_ERROR =
+    "ขออภัยครับ ระบบประมวลผลคำตอบไม่สำเร็จ (โมเดลอาจตอบไม่ครบหรือติดตัวกรองความปลอดภัย) กรุณาลองพิมพ์คำถามใหม่อีกครั้งครับ 🙏";
+
+  // Run a streaming stage with one automatic retry on a recoverable model error.
+  // `makeRun` must create a FRESH run each call (a run can only be consumed once).
+  // On retry we emit "reset" so the client discards the partial stream, then
+  // re-stream from scratch. If both attempts fail, throws a tagged error whose
+  // message is already user-friendly.
+  async function streamStageWithRetry(
+    makeRun: () => Promise<{ messages: AsyncIterable<{ text: AsyncIterable<string> }> }>,
+    stage: string,
+    opts?: { wireToolCalls?: boolean },
+  ): Promise<string> {
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        if (attempt > 0) {
+          log(`run[${stage}] — retrying after recoverable error (attempt ${attempt + 1}/2)`);
+          pushEvent("reset", {});
+        }
+        const run = await makeRun();
+        if (opts?.wireToolCalls) wireToolCallEvents(run, `${stage}#${attempt + 1}`);
+        return await streamRunToClient(run, attempt > 0 ? `${stage}#retry` : stage);
+      } catch (err) {
+        const recoverable = isRecoverableModelError(err);
+        console.warn(
+          `[deepagents][${elapsed()}] run[${stage}] — attempt ${attempt + 1} failed (recoverable: ${recoverable}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+        if (attempt === 0 && recoverable) continue;
+        throw new Error(FRIENDLY_ERROR);
+      }
+    }
+    // Unreachable, but satisfies the return type.
+    throw new Error(FRIENDLY_ERROR);
+  }
+
+  // collectRunText variant with the same one-retry policy (non-streamed stages).
+  async function collectStageWithRetry(
+    makeRun: () => Promise<{ messages: AsyncIterable<{ text: AsyncIterable<string> }> }>,
+    stage: string,
+  ): Promise<string> {
+    for (let attempt = 0; attempt <= 1; attempt++) {
+      try {
+        if (attempt > 0) log(`run[${stage}] — retrying after recoverable error (attempt ${attempt + 1}/2)`);
+        const run = await makeRun();
+        return await collectRunText(run, attempt > 0 ? `${stage}#retry` : stage);
+      } catch (err) {
+        const recoverable = isRecoverableModelError(err);
+        console.warn(
+          `[deepagents][${elapsed()}] run[${stage}] — attempt ${attempt + 1} failed (recoverable: ${recoverable}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+        if (attempt === 0 && recoverable) continue;
+        throw new Error(FRIENDLY_ERROR);
+      }
+    }
+    throw new Error(FRIENDLY_ERROR);
+  }
+
   // Run the Builder with output validation + automatic retry.
   // The Builder output STREAMS to the client token-by-token. After each run
   // completes we validate the full text against the guard rail allowlists; if it
@@ -266,11 +341,28 @@ export default defineEventHandler(async (event) => {
       });
 
       const builderMessages = [new HumanMessage(plannerOutput || "สร้างทีม TFT ตามแผนที่เลือก")];
-      const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
-      wireToolCallEvents(builderRun, `builder#${attempt + 1}`);
 
-      // Stream this attempt to the client as it generates.
-      const output = await streamRunToClient(builderRun, `builder#${attempt + 1}`);
+      // Stream this attempt to the client as it generates. A recoverable model
+      // error (e.g. Gemini "...reading 'parts'") consumes one of the attempts:
+      // reset the partial stream and let the loop re-run, or fail friendly if
+      // this was the last attempt.
+      let output: string;
+      try {
+        const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
+        wireToolCallEvents(builderRun, `builder#${attempt + 1}`);
+        output = await streamRunToClient(builderRun, `builder#${attempt + 1}`);
+      } catch (err) {
+        const recoverable = isRecoverableModelError(err);
+        console.warn(
+          `[deepagents][${elapsed()}] stage:builder — attempt ${attempt + 1} threw (recoverable: ${recoverable}): ${err instanceof Error ? err.message : String(err)}`,
+        );
+        if (attempt < MAX_BUILDER_RETRIES && recoverable) {
+          pushEvent("reset", {});
+          pushEvent("stage", { stage: "builder", label: `ลองสร้างใหม่ (รอบ ${attempt + 2})...` });
+          continue;
+        }
+        throw new Error(FRIENDLY_ERROR);
+      }
 
       const validation = validateCompOutput(output, guard);
       if (validation.valid) {
@@ -313,8 +405,19 @@ export default defineEventHandler(async (event) => {
         permissions: [],
       });
 
-      const routerRun = await routerAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
-      const routerOutput = await collectRunText(routerRun, "router");
+      // Router never streams to the client, so on a hard failure we silently
+      // default to build_team rather than aborting the whole request.
+      let routerOutput = "";
+      try {
+        routerOutput = await collectStageWithRetry(
+          () => routerAgent.streamEvents({ messages: lcMessages }, { version: "v3" }),
+          "router",
+        );
+      } catch (err) {
+        console.warn(
+          `[deepagents][${elapsed()}] stage:router — failed after retry, defaulting to build_team: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       log(`stage:router — raw output: ${routerOutput.slice(0, 200)}`);
 
       // Parse intent from router JSON output — tolerant of prose/code fences.
@@ -350,9 +453,11 @@ export default defineEventHandler(async (event) => {
           permissions: [],
         });
 
-        const answerRun = await answerAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
-        wireToolCallEvents(answerRun, "answer");
-        await streamRunToClient(answerRun, "answer");
+        await streamStageWithRetry(
+          () => answerAgent.streamEvents({ messages: lcMessages }, { version: "v3" }),
+          "answer",
+          { wireToolCalls: true },
+        );
         log("stage:answer — COMPLETE");
 
       } else if (intent === "clarify") {
@@ -367,8 +472,10 @@ export default defineEventHandler(async (event) => {
           permissions: [],
         });
 
-        const clarifyRun = await clarifyAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
-        await streamRunToClient(clarifyRun, "clarify");
+        await streamStageWithRetry(
+          () => clarifyAgent.streamEvents({ messages: lcMessages }, { version: "v3" }),
+          "clarify",
+        );
         log("stage:clarify — COMPLETE");
 
       } else if (intent === "confirm_intent") {
@@ -389,11 +496,14 @@ export default defineEventHandler(async (event) => {
           permissions: [],
         });
 
-        const plannerBuildRun = await plannerBuildAgent.streamEvents(
-          { messages: [new HumanMessage(latestUserText)] },
-          { version: "v3" },
+        const selectedPlanJson = await collectStageWithRetry(
+          () =>
+            plannerBuildAgent.streamEvents(
+              { messages: [new HumanMessage(latestUserText)] },
+              { version: "v3" },
+            ),
+          "plan",
         );
-        const selectedPlanJson = await collectRunText(plannerBuildRun, "plan");
         log(`stage:plan — DONE | extracted plan: ${selectedPlanJson.slice(0, 200)}`);
 
         // ── Builder receives the selected plan (streamed + validated + retry) ─
@@ -415,18 +525,26 @@ export default defineEventHandler(async (event) => {
           permissions: [],
         });
 
-        const proposeRun = await proposeAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
-        wireToolCallEvents(proposeRun, "propose");
         // Stream propose options directly to the client so user can pick A/B/C
-        await streamRunToClient(proposeRun, "propose");
+        await streamStageWithRetry(
+          () => proposeAgent.streamEvents({ messages: lcMessages }, { version: "v3" }),
+          "propose",
+          { wireToolCalls: true },
+        );
         log("stage:propose — COMPLETE");
       }
 
       log(`pipeline — DONE (total ${elapsed()})`);
     } catch (err) {
+      // Log the raw exception for debugging, but never leak it to the client —
+      // surface a friendly Thai message instead. Helpers already throw
+      // FRIENDLY_ERROR; anything else (e.g. guard-rail failure) is mapped here.
       console.error(`[deepagents][${elapsed()}] pipeline error:`, err);
-      const errMsg = err instanceof Error ? err.message : String(err);
-      pushEvent("error", { message: errMsg });
+      const raw = err instanceof Error ? err.message : String(err);
+      const userMessage = raw === FRIENDLY_ERROR ? raw : FRIENDLY_ERROR;
+      // code lets the client render this friendly message verbatim instead of
+      // overwriting it with a generic one (see normalizeError).
+      pushEvent("error", { code: "AI_STREAM_FAILED", message: userMessage });
     } finally {
       log("pipeline — closing stream");
       closeStream();

@@ -1,5 +1,6 @@
 import type { AiProvider, AiProviderConfig, AiMessage, AiStreamOptions } from "~/types/ai-provider";
 import type { ToolCallStep } from "~/types/chat";
+import { ApiException } from "~/types/api-error";
 
 export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider {
   return {
@@ -45,27 +46,37 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             const raw = line.slice(6).trim();
+
+            // Parse the SSE line. A parse failure (e.g. a chunk split mid-line)
+            // is skipped — but errors thrown while HANDLING a valid event below
+            // must propagate, so parsing is isolated in its own try/catch.
+            let event: { type: string; payload: unknown };
             try {
-              const event = JSON.parse(raw) as { type: string; payload: unknown };
-              if (event.type === "token" && typeof event.payload === "string") {
-                if (event.payload) yield event.payload;
-              } else if (event.type === "stage" && opts?.onStage) {
-                opts.onStage(event.payload as { stage: string; label: string });
-              } else if (event.type === "reset" && opts?.onReset) {
-                opts.onReset();
-              } else if (event.type === "tool_call" && opts?.onToolCall) {
-                opts.onToolCall(event.payload as ToolCallStep);
-              } else if (event.type === "error") {
-                const msg =
-                  typeof event.payload === "object" &&
-                  event.payload !== null &&
-                  "message" in event.payload
-                    ? String((event.payload as { message: unknown }).message)
-                    : "DeepAgents stream error";
-                throw new Error(msg);
-              }
+              event = JSON.parse(raw) as { type: string; payload: unknown };
             } catch {
-              // skip malformed line
+              continue; // malformed / partial line
+            }
+
+            if (event.type === "token" && typeof event.payload === "string") {
+              if (event.payload) yield event.payload;
+            } else if (event.type === "stage" && opts?.onStage) {
+              opts.onStage(event.payload as { stage: string; label: string });
+            } else if (event.type === "reset" && opts?.onReset) {
+              opts.onReset();
+            } else if (event.type === "tool_call" && opts?.onToolCall) {
+              opts.onToolCall(event.payload as ToolCallStep);
+            } else if (event.type === "error") {
+              // Server already produced a user-friendly message + code. Throw
+              // an ApiException so normalizeError can surface it verbatim
+              // instead of overwriting it with a generic message.
+              const payload =
+                typeof event.payload === "object" && event.payload !== null
+                  ? (event.payload as { code?: unknown; message?: unknown })
+                  : {};
+              const code = typeof payload.code === "string" ? payload.code : "AI_STREAM_FAILED";
+              const message =
+                typeof payload.message === "string" ? payload.message : "DeepAgents stream error";
+              throw new ApiException(503, { code, message });
             }
           }
         }

@@ -4,13 +4,21 @@ import { ApiException } from '~/types/api-error'
 export const isApiError = (e: unknown): e is ApiException =>
   e instanceof ApiException
 
+// Error codes whose backend message is already user-facing (localized, no
+// technical detail) and should be shown verbatim rather than replaced with a
+// generic one.
+const PASS_THROUGH_MESSAGE_CODES = new Set(['AI_STREAM_FAILED'])
+
 export const normalizeError = (e: unknown): AppError => {
   if (isApiError(e)) {
     const recoverable = e.status >= 500 || e.status === 408 || e.status === 429
+    const passThrough = PASS_THROUGH_MESSAGE_CODES.has(e.payload.code)
     return {
       kind: 'api',
       code: e.payload.code,
-      userMessage: 'เกิดข้อผิดพลาดจากระบบ กรุณาลองใหม่อีกครั้ง',
+      userMessage: passThrough
+        ? e.payload.message
+        : 'เกิดข้อผิดพลาดจากระบบ กรุณาลองใหม่อีกครั้ง',
       recoverable,
       cause: e,
     }

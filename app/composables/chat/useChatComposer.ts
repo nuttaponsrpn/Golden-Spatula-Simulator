@@ -300,9 +300,12 @@ export function useChatComposer(opts: ComposerOptions) {
           streamingStage.value = payload;
         },
         onReset: () => {
-          // Discard everything streamed so far — a fresh, validated run follows.
+          // Discard everything streamed so far — a fresh run follows (Builder
+          // validation retry, or a retry after a recoverable model error). The
+          // new run re-issues its own tool calls, so clear those too.
           rawAccumulator = "";
           streamingContent.value = "";
+          streamingToolCalls.value = [];
           history.messages.value = history.messages.value.map((m) =>
             m.id === aiMsgId ? { ...m, content: "", displayContent: "" } : m,
           );
