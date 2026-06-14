@@ -38,17 +38,31 @@ function mapTier(level: string): AugmentTier {
   }
 }
 
+export type AugmentDataMode = "summary" | "detail";
+
+export interface AugmentSummary {
+  id: string;
+  name: string;
+  tier: AugmentTier;
+}
+
 export default defineEventHandler(async (event) => {
   try {
     const query = getQuery(event);
     const mode = (query.mode as string) || "17";
+    const dataMode = (query.data_mode as AugmentDataMode) || "summary";
+    const idsFilter = query.ids
+      ? (Array.isArray(query.ids) ? query.ids : [query.ids]) as string[]
+      : undefined;
+    const tierFilter = query.tier as AugmentTier | undefined;
+
     const version = await fetchVersionByMode(mode);
     const url = buildDataUrl(version.hexurl);
 
     const text = await $fetch<string>(url, { parseResponse: (txt) => txt });
     const raw = JSON.parse(text.trim()) as RawHexData;
 
-    const augments: Augment[] = Object.values(raw.data).map((a) => ({
+    let augments: Augment[] = Object.values(raw.data).map((a) => ({
       id: a.id,
       name: a.name,
       description: a.desc,
@@ -56,6 +70,23 @@ export default defineEventHandler(async (event) => {
       tier: mapTier(a.level),
       isLegend: a.is_legend === 1,
     }));
+
+    if (tierFilter) {
+      augments = augments.filter((a) => a.tier === tierFilter);
+    }
+
+    if (idsFilter && idsFilter.length > 0) {
+      augments = augments.filter((a) => idsFilter.includes(a.id));
+    }
+
+    if (dataMode === "summary") {
+      const summaries: AugmentSummary[] = augments.map((a) => ({
+        id: a.id,
+        name: a.name,
+        tier: a.tier,
+      }));
+      return summaries;
+    }
 
     return augments;
   } catch (error: unknown) {
