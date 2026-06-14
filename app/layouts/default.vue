@@ -78,7 +78,15 @@
     </nav>
 
     <main class="flex-1 min-h-0 overflow-hidden">
-      <div class="mx-auto max-w-screen-xl px-4 py-6 h-full overflow-y-auto">
+      <!-- fullBleed pages (e.g. chat) manage their own internal scroll regions,
+           so the wrapper must not add padding or its own scrollbar -->
+      <div
+        v-if="fullBleed"
+        class="mx-auto h-full w-full max-w-screen-xl min-h-0 overflow-hidden px-4"
+      >
+        <slot />
+      </div>
+      <div v-else class="mx-auto max-w-screen-xl px-4 py-6 h-full overflow-y-auto">
         <slot />
       </div>
     </main>
@@ -105,6 +113,10 @@ const { versions, init } = useGsData();
 const { sessions } = useChatSessions();
 const mobileMenuOpen = ref(false);
 const route = useRoute();
+
+// Pages can opt into full-bleed mode (no wrapper padding / scroll) via
+// definePageMeta({ fullBleed: true }) when they manage their own scroll regions.
+const fullBleed = computed(() => route.meta["fullBleed"] === true);
 
 const isOnChatPage = computed(() => route.path === "/chat");
 const hasChatSession = computed(() => isOnChatPage.value && sessions.value.length > 0);

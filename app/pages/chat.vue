@@ -157,7 +157,7 @@
       />
 
       <!-- Composer -->
-      <div class="border-t border-gray-800 px-4 py-3 shrink-0 pb-0">
+      <div class="border-t border-gray-800 px-4 py-3 shrink-0">
         <ChatComposerInput :disabled="isStreaming || !activeSessionId" @submit="onSubmit" />
       </div>
     </div>
@@ -199,7 +199,7 @@
 import type { PlacedUnits } from "~/types/team";
 import type { ChatSession } from "~/types/chat";
 
-definePageMeta({ ssr: false });
+definePageMeta({ ssr: false, fullBleed: true });
 useHead({ title: "Chat — Golden Spatula Simulator" });
 
 const route = useRoute();
