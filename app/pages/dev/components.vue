@@ -3,7 +3,7 @@
     <!-- Sidebar -->
     <div class="w-72 border-r border-gray-800 flex flex-col">
       <div class="p-4 border-b border-gray-800">
-        <h1 class="font-bold text-xl text-blue-400">TFT Simulator</h1>
+        <h1 class="font-bold text-xl text-blue-400">Golden Spatula Simulator</h1>
         <p class="text-xs text-gray-500">Component Explorer</p>
       </div>
       

@@ -7,7 +7,7 @@ export default defineNuxtConfig({
     manifest: {
       name: 'Golden Spatula Simulator',
       short_name: 'GS Sim',
-      description: 'TFT Set 14 Cyber City team composition builder with AI advisor',
+      description: 'Golden Spatula team composition builder with AI advisor',
       theme_color: '#1a1a2e',
       background_color: '#0d0d1a',
       display: 'standalone',
