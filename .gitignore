@@ -11,3 +11,4 @@ debug/
 *.txt
 verify-*.png
 verify-*.mjs
+.claude/worktrees/
