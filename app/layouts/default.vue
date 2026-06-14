@@ -10,17 +10,11 @@
           </NuxtLink>
 
           <!-- Version Selector -->
-          <div v-if="versions.length > 0" class="flex items-center">
-            <select
-              :value="activeMode"
-              class="bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cost-5"
-              @change="handleVersionChange"
-            >
-              <option v-for="v in versions" :key="v.mode" :value="v.mode">
-                {{ v.name }} ({{ v.version }})
-              </option>
-            </select>
-          </div>
+          <ChatVersionSelector
+            v-if="versions.length > 0"
+            :has-active-session="isOnChatPage && hasChatSession"
+            @version-change="onVersionChange"
+          />
         </div>
 
         <!-- Desktop nav -->
@@ -105,14 +99,17 @@
 
 <script setup lang="ts">
 const { error: globalError, clearGlobalError } = useGlobalError();
-const { versions, activeMode, init } = useGsData();
+const { versions, init } = useGsData();
+const { sessions } = useChatSessions();
 const mobileMenuOpen = ref(false);
 const route = useRoute();
 
-const handleVersionChange = async (event: Event) => {
-  const select = event.target as HTMLSelectElement;
-  await init(select.value);
-};
+const isOnChatPage = computed(() => route.path === "/chat");
+const hasChatSession = computed(() => isOnChatPage.value && sessions.value.length > 0);
+
+async function onVersionChange(mode: string): Promise<void> {
+  await init(mode);
+}
 
 onMounted(async () => {
   await init();

@@ -229,6 +229,14 @@ watch(messages, (msgs) => {
   }
 }, { deep: false });
 
+// When game mode changes (e.g. from the layout header selector), start a new session
+// so the composer uses data for the correct version
+watch(gsActiveMode, (newMode, oldMode) => {
+  if (oldMode !== undefined && newMode !== oldMode) {
+    startNewSession();
+  }
+});
+
 // Sync URL when active session changes
 watch(activeSessionId, (id) => {
   const query = id ? { id } : {};
