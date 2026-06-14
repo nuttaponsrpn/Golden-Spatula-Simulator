@@ -11,6 +11,7 @@
 // internal /api/gs/* endpoints (same path the LangChain tools use).
 
 import { fetchVersionByMode } from "./gsVersion";
+import { parseJsonObject } from "./extractJson";
 
 interface TraitSummaryLike {
   id: string;
@@ -183,15 +184,9 @@ export function validateCompOutput(
 ): CompValidationResult {
   const errors: string[] = [];
 
-  const cleaned = rawOutput.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
-  if (!cleaned.startsWith("{")) {
-    return { valid: false, errors: ["Output is not a JSON object."] };
-  }
-
-  let parsed: { comp?: ParsedComp } | null = null;
-  try {
-    parsed = JSON.parse(cleaned) as { comp?: ParsedComp };
-  } catch {
+  // Tolerant of prose/code fences Gemini may wrap around the JSON object.
+  const parsed = parseJsonObject<{ comp?: ParsedComp }>(rawOutput);
+  if (!parsed) {
     return { valid: false, errors: ["Output is not valid JSON — it must be a single parseable JSON object."] };
   }
 

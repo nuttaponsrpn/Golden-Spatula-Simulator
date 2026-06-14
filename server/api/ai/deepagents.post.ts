@@ -17,6 +17,7 @@ import {
   validateCompOutput,
   buildRetryFeedback,
 } from "../../utils/gsGuardRail";
+import { parseJsonObject } from "../../utils/extractJson";
 import {
   buildRouterPrompt,
   buildPlannerProposePrompt,
@@ -316,11 +317,10 @@ export default defineEventHandler(async (event) => {
       const routerOutput = await collectRunText(routerRun, "router");
       log(`stage:router — raw output: ${routerOutput.slice(0, 200)}`);
 
-      // Parse intent from router JSON output
+      // Parse intent from router JSON output — tolerant of prose/code fences.
       let intent: DeepAgentIntent = "build_team";
-      try {
-        const cleaned = routerOutput.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
-        const parsed = JSON.parse(cleaned) as { intent?: string; reasoning?: string };
+      const parsed = parseJsonObject<{ intent?: string; reasoning?: string }>(routerOutput);
+      if (parsed) {
         if (
           parsed.intent === "build_team" ||
           parsed.intent === "answer_question" ||
@@ -330,7 +330,7 @@ export default defineEventHandler(async (event) => {
           intent = parsed.intent;
         }
         log(`stage:router — DONE | intent: ${intent} | reasoning: ${parsed.reasoning ?? ""}`);
-      } catch {
+      } else {
         console.warn(`[deepagents][${elapsed()}] stage:router — failed to parse intent, defaulting to build_team`);
       }
 

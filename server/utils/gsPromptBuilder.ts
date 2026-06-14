@@ -89,7 +89,11 @@ Rules:
 - Do NOT include unit slot assignments — that is the Builder's job`;
 
 const BUILDER_OUTPUT_SCHEMA = `## Builder Output Schema
-You MUST output a single valid JSON object. No markdown code blocks. No text outside the JSON.
+CRITICAL OUTPUT RULE — your entire response MUST be a single raw JSON object and NOTHING else:
+- The FIRST character you emit MUST be "{" and the LAST character MUST be "}".
+- Do NOT wrap the JSON in markdown code fences (no \`\`\`json).
+- Do NOT write any greeting, explanation, or sign-off before or after the JSON (no "Sure!", no "Here is the comp:", no "Hope this helps").
+- All human-readable explanation belongs INSIDE the JSON fields (text, explanation, playstyle, etc.), never outside.
 
 {
   "title": "Short session title (5-8 words in Thai)",
@@ -233,7 +237,10 @@ ${toolOrder}
 ${anchorSection}
 ## Output Format
 Respond with a JSON object containing the propose text AND the raw plan data for each option.
-No markdown code blocks. No text outside the JSON.
+CRITICAL OUTPUT RULE — your entire response MUST be a single raw JSON object and NOTHING else:
+- The FIRST character you emit MUST be "{" and the LAST character MUST be "}".
+- Do NOT wrap the JSON in markdown code fences (no \`\`\`json).
+- Do NOT write any greeting or sign-off before or after the JSON. All chat text belongs inside the "text" field.
 
 {
   "title": "Short Thai session title (5-8 words)",
@@ -301,7 +308,7 @@ The user has asked a question about game mechanics, meta, synergies, items, or s
 Answer concisely and helpfully. You may use the get_traits, get_champions, get_items, or get_augments tools if you need to look up specific current data, but for general questions answer directly from your knowledge.
 
 ## Output Format
-Respond with a single JSON object. No markdown code blocks. No text outside the JSON.
+Your entire response MUST be a single raw JSON object and NOTHING else — first character "{", last character "}". No markdown code fences (no \`\`\`json). No greeting or sign-off outside the JSON; put all chat text inside the "text" field.
 {
   "title": "Short Thai session title (5-8 words)",
   "text": "Your full answer here in plain conversational Thai or English matching the user's language"
@@ -326,7 +333,7 @@ Focus on the most impactful unknowns:
 Keep it brief — maximum 2 questions with A/B/C options each.
 
 ## Output Format
-Respond with a single JSON object. No markdown code blocks. No text outside the JSON.
+Your entire response MUST be a single raw JSON object and NOTHING else — first character "{", last character "}". No markdown code fences (no \`\`\`json). No greeting or sign-off outside the JSON; put all chat text inside the "text" field.
 {
   "title": "Short Thai session title (5-8 words)",
   "text": "Your clarifying questions here with lettered options"

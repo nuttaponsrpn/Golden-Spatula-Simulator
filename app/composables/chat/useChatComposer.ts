@@ -42,67 +42,53 @@ function generateBoardPositions(): BoardPosition[] {
   return positions;
 }
 
-function cleanJsonString(content: string): string {
-  if (!content) return "";
-  // Strip markdown code block wrappers (e.g. ```json \n ... \n ```)
-  return content.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
-}
-
 function parseAiResponse(content: string): AiResponseParseResult {
-  const trimmed = cleanJsonString(content);
-  if (!trimmed.startsWith("{")) return { kind: "unparsed" };
-  try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    if (typeof parsed !== "object" || parsed === null) return { kind: "unparsed" };
+  // Extract the first balanced JSON object — tolerant of prose/code fences that
+  // Gemini sometimes wraps around the JSON despite the prompt forbidding it.
+  const parsed = parseJsonObject<Record<string, unknown>>(content);
+  if (!parsed || typeof parsed !== "object") return { kind: "unparsed" };
 
-    const envelope = parsed as unknown as AiResponseEnvelope;
-    const title = typeof envelope.title === "string" ? envelope.title : "";
-    const text = typeof envelope.text === "string" ? envelope.text : undefined;
+  const envelope = parsed as unknown as AiResponseEnvelope;
+  const title = typeof envelope.title === "string" ? envelope.title : "";
+  const text = typeof envelope.text === "string" ? envelope.text : undefined;
 
-    if (envelope.comp && typeof envelope.comp === "object" && Array.isArray((envelope.comp as AiTeamCompResponse).units)) {
-      return { kind: "team-comp", data: envelope.comp as AiTeamCompResponse, title, text };
-    }
-
-    return { kind: "text-only", title, text };
-  } catch {
-    // not valid JSON
+  if (envelope.comp && typeof envelope.comp === "object" && Array.isArray((envelope.comp as AiTeamCompResponse).units)) {
+    return { kind: "team-comp", data: envelope.comp as AiTeamCompResponse, title, text };
   }
-  return { kind: "unparsed" };
+
+  return { kind: "text-only", title, text };
 }
 
 // Extract human-readable text from raw content (may be partial during streaming)
 function extractDisplayText(rawContent: string): string {
-  const trimmed = cleanJsonString(rawContent);
-  if (!trimmed.startsWith("{")) return rawContent;
-  try {
-    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-    const envelope = parsed as unknown as AiResponseEnvelope;
-    
-    const parts: string[] = [];
-    if (typeof envelope.text === "string" && envelope.text.trim()) {
-      parts.push(envelope.text.trim());
-    }
-    
-    if (envelope.comp && typeof envelope.comp === "object") {
-      const comp = envelope.comp as AiTeamCompResponse;
-      if (typeof comp.explanation === "string" && comp.explanation.trim()) {
-        parts.push(`📝 **คำอธิบาย:**\n${comp.explanation.trim()}`);
-      }
-      if (typeof comp.playstyle === "string" && comp.playstyle.trim()) {
-        parts.push(`🎮 **วิธีการเล่น:**\n${comp.playstyle.trim()}`);
-      }
-      if (typeof comp.synergyReasoning === "string" && comp.synergyReasoning.trim()) {
-        parts.push(`🔗 **Synergy Reasoning:**\n${comp.synergyReasoning.trim()}`);
-      }
-      if (typeof comp.itemReasoning === "string" && comp.itemReasoning.trim()) {
-        parts.push(`⚔️ **Item Reasoning:**\n${comp.itemReasoning.trim()}`);
-      }
-    }
-    
-    if (parts.length > 0) return parts.join("\n\n");
-  } catch {
-    // still streaming — return raw so user sees progress
+  const parsed = parseJsonObject<Record<string, unknown>>(rawContent);
+  // Still streaming / no JSON yet → show raw so the user sees progress
+  if (!parsed) return rawContent;
+
+  const envelope = parsed as unknown as AiResponseEnvelope;
+
+  const parts: string[] = [];
+  if (typeof envelope.text === "string" && envelope.text.trim()) {
+    parts.push(envelope.text.trim());
   }
+
+  if (envelope.comp && typeof envelope.comp === "object") {
+    const comp = envelope.comp as AiTeamCompResponse;
+    if (typeof comp.explanation === "string" && comp.explanation.trim()) {
+      parts.push(`📝 **คำอธิบาย:**\n${comp.explanation.trim()}`);
+    }
+    if (typeof comp.playstyle === "string" && comp.playstyle.trim()) {
+      parts.push(`🎮 **วิธีการเล่น:**\n${comp.playstyle.trim()}`);
+    }
+    if (typeof comp.synergyReasoning === "string" && comp.synergyReasoning.trim()) {
+      parts.push(`🔗 **Synergy Reasoning:**\n${comp.synergyReasoning.trim()}`);
+    }
+    if (typeof comp.itemReasoning === "string" && comp.itemReasoning.trim()) {
+      parts.push(`⚔️ **Item Reasoning:**\n${comp.itemReasoning.trim()}`);
+    }
+  }
+
+  if (parts.length > 0) return parts.join("\n\n");
   return rawContent;
 }
 
