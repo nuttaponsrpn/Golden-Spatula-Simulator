@@ -232,11 +232,15 @@ export function useChatComposer(opts: ComposerOptions) {
       .map((id) => allChampions.value.find((c) => c.id === id))
       .filter((c): c is NonNullable<typeof c> => c !== undefined);
 
-    const systemPrompt = promptBuilder.buildSystemPrompt({
-      anchorChampions,
-      allChampions: champions,
-      allItems: items,
-    });
+    // DeepAgents fetches live data via tools — do not embed roster in prompt
+    const isDeepAgents = aiProvider.config.value?.kind === "deepagents";
+    const systemPrompt = isDeepAgents
+      ? promptBuilder.buildDeepAgentsSystemPrompt(anchorChampions)
+      : promptBuilder.buildSystemPrompt({
+          anchorChampions,
+          allChampions: champions,
+          allItems: items,
+        });
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),

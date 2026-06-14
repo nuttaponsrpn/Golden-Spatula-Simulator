@@ -30,36 +30,48 @@ export default defineEventHandler(async (event) => {
   const tools = createGsTools(`${protocol}://${host}`);
 
   const agent = createDeepAgent({
-    model: "google-genai/gemini-2.5-pro",
+    model: "google-genai:gemini-2.5-pro",
     tools,
     systemPrompt: body.systemPrompt,
     permissions: [],
   });
 
+  console.log("[deepagents] calling streamEvents...");
   const run = await agent.streamEvents(
     { messages: lcMessages },
     { version: "v3" },
   );
+  console.log("[deepagents] streamEvents returned, run keys:", Object.keys(run as object));
 
-  // Consume tool calls fire-and-forget — reserved for ThinkingPanel wiring
+  // Log tool calls for debugging
   (async () => {
-    for await (const _call of run.toolCalls) {
-      /* reserved */
+    for await (const call of run.toolCalls) {
+      console.log("[deepagents] tool call:", JSON.stringify(call).slice(0, 300));
     }
-  })().catch(() => {});
+    console.log("[deepagents] toolCalls iteration done");
+  })().catch((err) => console.error("[deepagents] toolCalls error:", err));
 
   // Use Node.js Readable — h3's sendStream requires a Node stream, not Web ReadableStream
   const nodeStream = new Readable({ read() {} });
 
   (async () => {
     try {
+      console.log("[deepagents] starting message iteration...");
+      let msgCount = 0;
       for await (const msg of run.messages) {
+        msgCount++;
+        console.log(`[deepagents] message #${msgCount}, msg keys:`, Object.keys(msg as object));
+        let tokenCount = 0;
         for await (const token of msg.text) {
+          tokenCount++;
+          if (tokenCount === 1) console.log(`[deepagents] first token of msg #${msgCount}:`, JSON.stringify(token).slice(0, 80));
           nodeStream.push(`data: ${JSON.stringify(token)}\n\n`);
         }
+        console.log(`[deepagents] msg #${msgCount} done, ${tokenCount} tokens`);
       }
-    } catch {
-      // stream ends on error
+      console.log(`[deepagents] all messages done, total: ${msgCount}`);
+    } catch (err) {
+      console.error("[deepagents] stream error:", err);
     } finally {
       nodeStream.push(null);
     }
