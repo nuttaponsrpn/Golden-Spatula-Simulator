@@ -1,3 +1,5 @@
+import type { ToolCallStep } from "./chat";
+
 export type AiProviderKind = "claude" | "gemini" | "gemini-default" | "copilot" | "deepagents";
 
 export interface AiProviderConfig {
@@ -12,11 +14,17 @@ export interface AiMessage {
   content: string;
 }
 
+export interface AiStreamOptions {
+  signal?: AbortSignal;
+  /** Called each time a tool call event arrives (DeepAgents only) */
+  onToolCall?: (step: ToolCallStep) => void;
+}
+
 export interface AiProvider {
   readonly kind: AiProviderKind;
   sendMessage(
     messages: AiMessage[],
     systemPrompt: string,
-    signal?: AbortSignal,
+    opts?: AiStreamOptions,
   ): AsyncIterableIterator<string>;
 }

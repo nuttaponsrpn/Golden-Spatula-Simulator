@@ -1,4 +1,5 @@
-import type { AiProvider, AiProviderConfig, AiMessage } from "~/types/ai-provider";
+import type { AiProvider, AiProviderConfig, AiMessage, AiStreamOptions } from "~/types/ai-provider";
+import type { ToolCallStep } from "~/types/chat";
 
 export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider {
   return {
@@ -7,13 +8,13 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
     async *sendMessage(
       messages: AiMessage[],
       systemPrompt: string,
-      signal?: AbortSignal,
+      opts?: AiStreamOptions,
     ): AsyncIterableIterator<string> {
       const response = await fetch("/api/ai/deepagents", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ messages, systemPrompt }),
-        signal,
+        signal: opts?.signal,
       });
 
       if (!response.ok) {
@@ -38,10 +39,14 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
 
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
-            const data = line.slice(6).trim();
+            const raw = line.slice(6).trim();
             try {
-              const token = JSON.parse(data) as string;
-              if (token) yield token;
+              const event = JSON.parse(raw) as { type: string; payload: unknown };
+              if (event.type === "token" && typeof event.payload === "string") {
+                if (event.payload) yield event.payload;
+              } else if (event.type === "tool_call" && opts?.onToolCall) {
+                opts.onToolCall(event.payload as ToolCallStep);
+              }
             } catch {
               // skip malformed line
             }

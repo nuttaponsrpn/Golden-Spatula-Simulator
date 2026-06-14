@@ -1,4 +1,4 @@
-import type { AiProvider, AiProviderConfig, AiMessage } from "~/types/ai-provider";
+import type { AiProvider, AiProviderConfig, AiMessage, AiStreamOptions } from "~/types/ai-provider";
 
 export function createClaudeProvider(config: AiProviderConfig): AiProvider {
   return {
@@ -6,7 +6,7 @@ export function createClaudeProvider(config: AiProviderConfig): AiProvider {
     async *sendMessage(
       messages: AiMessage[],
       systemPrompt: string,
-      signal?: AbortSignal,
+      opts?: AiStreamOptions,
     ): AsyncIterableIterator<string> {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -22,7 +22,7 @@ export function createClaudeProvider(config: AiProviderConfig): AiProvider {
           messages,
           stream: true,
         }),
-        signal,
+        signal: opts?.signal,
       });
 
       if (!response.ok) {

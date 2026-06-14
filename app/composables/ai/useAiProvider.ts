@@ -1,4 +1,4 @@
-import type { AiProvider, AiProviderConfig, AiMessage } from "~/types/ai-provider";
+import type { AiProvider, AiProviderConfig, AiMessage, AiStreamOptions } from "~/types/ai-provider";
 import type { AppError } from "~/types/app-error";
 import { normalizeError, validationError } from "~/utils/error";
 import { createClaudeProvider } from "./providers/claude";
@@ -59,7 +59,7 @@ export function useAiProvider() {
   function sendMessage(
     messages: AiMessage[],
     systemPrompt: string,
-    signal?: AbortSignal,
+    opts?: AiStreamOptions,
   ):
     | { status: "success"; iterator: AsyncIterableIterator<string> }
     | { status: "error"; error: AppError } {
@@ -73,7 +73,7 @@ export function useAiProvider() {
       };
     }
     try {
-      const iterator = activeProvider.value.sendMessage(messages, systemPrompt, signal);
+      const iterator = activeProvider.value.sendMessage(messages, systemPrompt, opts);
       return { status: "success", iterator };
     } catch (e) {
       return { status: "error", error: normalizeError(e) };

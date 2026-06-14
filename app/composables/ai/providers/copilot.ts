@@ -1,4 +1,4 @@
-import type { AiProvider, AiProviderConfig, AiMessage } from "~/types/ai-provider";
+import type { AiProvider, AiProviderConfig, AiMessage, AiStreamOptions } from "~/types/ai-provider";
 
 export function createCopilotProvider(config: AiProviderConfig): AiProvider {
   return {
@@ -6,7 +6,7 @@ export function createCopilotProvider(config: AiProviderConfig): AiProvider {
     async *sendMessage(
       messages: AiMessage[],
       systemPrompt: string,
-      signal?: AbortSignal,
+      opts?: AiStreamOptions,
     ): AsyncIterableIterator<string> {
       const baseUrl = config.baseUrl ?? "https://api.openai.com/v1";
 
@@ -24,7 +24,7 @@ export function createCopilotProvider(config: AiProviderConfig): AiProvider {
             ...messages,
           ],
         }),
-        signal,
+        signal: opts?.signal,
       });
 
       if (!response.ok) {

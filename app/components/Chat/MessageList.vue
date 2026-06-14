@@ -10,10 +10,15 @@
       :message="msg"
     />
 
-    <div v-if="streamingMessage !== null" class="flex flex-row gap-3">
+    <div v-if="streamingMessage !== null || streamingToolCalls.length > 0" class="flex flex-row gap-3">
       <div
         class="max-w-[80%] rounded-2xl rounded-tl-sm bg-gray-800 px-4 py-3 text-sm leading-relaxed text-gray-100 whitespace-pre-wrap break-words"
       >
+        <ChatThinkingPanel
+          v-if="streamingToolCalls.length > 0"
+          :steps="streamingToolCalls"
+          :is-streaming="true"
+        />
         <span v-if="!streamingMessage">
           <span class="inline-flex gap-1 items-center text-gray-400">
             <span class="animate-bounce" style="animation-delay: 0ms">●</span>
@@ -28,11 +33,12 @@
 </template>
 
 <script setup lang="ts">
-import type { ChatMessage } from "~/types/chat";
+import type { ChatMessage, ToolCallStep } from "~/types/chat";
 
 const props = defineProps<{
   messages: ChatMessage[];
   streamingMessage: string | null;
+  streamingToolCalls: ToolCallStep[];
 }>();
 
 const completedMessages = computed(() =>
@@ -47,7 +53,7 @@ function scrollToBottom(): void {
 }
 
 watch(
-  () => [props.messages.length, props.streamingMessage],
+  () => [props.messages.length, props.streamingMessage, props.streamingToolCalls.length],
   () => nextTick(scrollToBottom),
 );
 

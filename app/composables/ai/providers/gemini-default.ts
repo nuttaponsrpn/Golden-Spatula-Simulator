@@ -1,4 +1,4 @@
-import type { AiProvider, AiMessage } from "~/types/ai-provider";
+import type { AiProvider, AiMessage, AiStreamOptions } from "~/types/ai-provider";
 
 interface GeminiContent {
   role: "user" | "model";
@@ -11,7 +11,7 @@ export function createGeminiDefaultProvider(): AiProvider {
     async *sendMessage(
       messages: AiMessage[],
       systemPrompt: string,
-      signal?: AbortSignal,
+      opts?: AiStreamOptions,
     ): AsyncIterableIterator<string> {
       const contents: GeminiContent[] = messages.map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -25,7 +25,7 @@ export function createGeminiDefaultProvider(): AiProvider {
           systemInstruction: { parts: [{ text: systemPrompt }] },
           messages: contents,
         }),
-        signal,
+        signal: opts?.signal,
       });
 
       if (!response.ok) {

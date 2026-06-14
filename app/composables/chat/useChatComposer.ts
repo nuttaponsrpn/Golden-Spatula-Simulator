@@ -8,6 +8,7 @@ import type {
   AiResponseEnvelope,
   AiResponseParseResult,
   AiUnitSpec,
+  ToolCallStep,
 } from "~/types/chat";
 import type { AiMessage } from "~/types/ai-provider";
 import type { AppError } from "~/types/app-error";
@@ -196,8 +197,8 @@ export function useChatComposer(opts: ComposerOptions) {
   const { updateSession } = useChatSessions();
 
   const isStreaming = ref(false);
-  // streamingContent holds the human-readable text extracted in real time
   const streamingContent = ref("");
+  const streamingToolCalls = ref<ToolCallStep[]>([]);
 
   let abortController: AbortController | null = null;
 
@@ -273,11 +274,22 @@ export function useChatComposer(opts: ComposerOptions) {
     abortController = new AbortController();
     isStreaming.value = true;
     streamingContent.value = "";
+    streamingToolCalls.value = [];
 
     const providerResult = aiProvider.sendMessage(
       aiMessages,
       systemPrompt,
-      abortController.signal,
+      {
+        signal: abortController.signal,
+        onToolCall: (step) => {
+          const existing = streamingToolCalls.value.findIndex((s) => s.id === step.id);
+          if (existing >= 0) {
+            streamingToolCalls.value[existing] = step;
+          } else {
+            streamingToolCalls.value = [...streamingToolCalls.value, step];
+          }
+        },
+      },
     );
 
     if (providerResult.status === "error") {
@@ -339,11 +351,16 @@ export function useChatComposer(opts: ComposerOptions) {
         displayContent = parseResult.text?.trim() || extractDisplayText(rawAccumulator);
       }
 
+      const finalToolCalls = streamingToolCalls.value.length > 0
+        ? [...streamingToolCalls.value]
+        : undefined;
+
       await history.updateMessage(aiMsgId, {
         content: rawAccumulator,
         displayContent,
         status: "done",
         boardSnapshot: boardData ?? undefined,
+        toolCalls: finalToolCalls,
       });
 
       // Update session title from AI response (only when we got a parsed title)
@@ -375,6 +392,7 @@ export function useChatComposer(opts: ComposerOptions) {
     } finally {
       isStreaming.value = false;
       streamingContent.value = "";
+      streamingToolCalls.value = [];
       abortController = null;
     }
   }
@@ -383,5 +401,5 @@ export function useChatComposer(opts: ComposerOptions) {
     abortController?.abort();
   }
 
-  return { sendMessage, cancelStreaming, isStreaming, streamingContent, messages: history.messages };
+  return { sendMessage, cancelStreaming, isStreaming, streamingContent, streamingToolCalls, messages: history.messages };
 }

@@ -43,33 +43,36 @@ export default defineEventHandler(async (event) => {
   );
   console.log("[deepagents] streamEvents returned, run keys:", Object.keys(run as object));
 
-  // Log tool calls for debugging
-  (async () => {
-    for await (const call of run.toolCalls) {
-      console.log("[deepagents] tool call:", JSON.stringify(call).slice(0, 300));
-    }
-    console.log("[deepagents] toolCalls iteration done");
-  })().catch((err) => console.error("[deepagents] toolCalls error:", err));
-
   // Use Node.js Readable — h3's sendStream requires a Node stream, not Web ReadableStream
   const nodeStream = new Readable({ read() {} });
 
+  function pushEvent(type: string, payload: unknown): void {
+    nodeStream.push(`data: ${JSON.stringify({ type, payload })}\n\n`);
+  }
+
+  // Tool call events — streamed to client as they happen
+  (async () => {
+    for await (const call of run.toolCalls) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deepagents ToolCallStream has no stable public type
+      const c = (call as unknown) as { id?: string; name?: string; input?: unknown; output?: unknown; status?: string };
+      pushEvent("tool_call", {
+        id: c.id ?? crypto.randomUUID(),
+        toolName: c.name ?? "unknown",
+        input: c.input ?? {},
+        resultSummary: c.output ? String(c.output).slice(0, 200) : undefined,
+        status: c.status === "error" ? "error" : "done",
+      });
+    }
+  })().catch((err) => console.error("[deepagents] toolCalls error:", err));
+
+  // Message token events
   (async () => {
     try {
-      console.log("[deepagents] starting message iteration...");
-      let msgCount = 0;
       for await (const msg of run.messages) {
-        msgCount++;
-        console.log(`[deepagents] message #${msgCount}, msg keys:`, Object.keys(msg as object));
-        let tokenCount = 0;
         for await (const token of msg.text) {
-          tokenCount++;
-          if (tokenCount === 1) console.log(`[deepagents] first token of msg #${msgCount}:`, JSON.stringify(token).slice(0, 80));
-          nodeStream.push(`data: ${JSON.stringify(token)}\n\n`);
+          pushEvent("token", token);
         }
-        console.log(`[deepagents] msg #${msgCount} done, ${tokenCount} tokens`);
       }
-      console.log(`[deepagents] all messages done, total: ${msgCount}`);
     } catch (err) {
       console.error("[deepagents] stream error:", err);
     } finally {

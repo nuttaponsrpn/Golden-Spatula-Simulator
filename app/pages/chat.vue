@@ -94,6 +94,7 @@
         class="flex-1 min-h-0"
         :messages="messages"
         :streaming-message="isStreaming ? streamingContent : null"
+        :streaming-tool-calls="streamingToolCalls"
       />
 
       <!-- Composer -->
@@ -180,6 +181,7 @@ const composer = ref<Composer | null>(null);
 const messages = computed(() => composer.value?.messages ?? []);
 const isStreaming = computed(() => composer.value?.isStreaming ?? false);
 const streamingContent = computed(() => composer.value?.streamingContent ?? "");
+const streamingToolCalls = computed(() => composer.value?.streamingToolCalls ?? ([] as import("~/types/chat").ToolCallStep[]));
 
 const revisions = computed(() =>
   messages.value.filter((m) => m.role === "assistant" && m.boardSnapshot && m.boardSnapshot.length > 0),

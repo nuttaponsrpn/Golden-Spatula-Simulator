@@ -1,4 +1,4 @@
-import type { AiProvider, AiProviderConfig, AiMessage } from "~/types/ai-provider";
+import type { AiProvider, AiProviderConfig, AiMessage, AiStreamOptions } from "~/types/ai-provider";
 
 interface GeminiContent {
   role: "user" | "model";
@@ -11,7 +11,7 @@ export function createGeminiProvider(config: AiProviderConfig): AiProvider {
     async *sendMessage(
       messages: AiMessage[],
       systemPrompt: string,
-      signal?: AbortSignal,
+      opts?: AiStreamOptions,
     ): AsyncIterableIterator<string> {
       const model = config.model ?? "gemini-2.0-flash";
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${config.apiKey}&alt=sse`;
@@ -28,7 +28,7 @@ export function createGeminiProvider(config: AiProviderConfig): AiProvider {
           systemInstruction: { parts: [{ text: systemPrompt }] },
           contents,
         }),
-        signal,
+        signal: opts?.signal,
       });
 
       if (!response.ok) {
