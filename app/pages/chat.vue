@@ -151,6 +151,8 @@ const { champions, items, init } = useGsData();
 const { loadUnits } = useTeamBuilder();
 const { sessions, loadSessions, createSession, updateSession, deleteSession } = useChatSessions();
 const { showError } = useErrorHandler();
+const aiProvider = useAiProvider();
+const promptBuilder = useChatPromptBuilder();
 
 const activeSessionId = ref<string | null>(null);
 const anchorChampionIds = ref<string[]>([]);
@@ -199,6 +201,11 @@ watch(activeSessionId, (sessionId) => {
     anchorChampionIds: anchorChampionIds.value,
     champions: champions.value,
     items: items.value,
+    deps: {
+      aiProvider,
+      allChampions: champions,
+      updateSession,
+    },
   });
 }, { immediate: false });
 

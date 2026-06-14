@@ -12,7 +12,16 @@ import type {
 } from "~/types/chat";
 import type { AiMessage } from "~/types/ai-provider";
 import type { AppError } from "~/types/app-error";
+import type { Ref } from "vue";
 import { normalizeError } from "~/utils/error";
+
+// Injected dependencies — composables that require Vue setup context
+// are passed in so useChatComposer can be called inside watch callbacks
+export interface ComposerDeps {
+  aiProvider: ReturnType<typeof useAiProvider>;
+  allChampions: Ref<Champion[]>;
+  updateSession: ReturnType<typeof useChatSessions>["updateSession"];
+}
 
 const BOARD_ROWS = 4;
 const BOARD_COLS = 7;
@@ -185,16 +194,15 @@ interface ComposerOptions {
   anchorChampionIds: string[];
   champions: Champion[];
   items: Item[];
+  deps: ComposerDeps;
 }
 
 export function useChatComposer(opts: ComposerOptions) {
-  const { sessionId, anchorChampionIds, champions, items } = opts;
-
-  const aiProvider = useAiProvider();
+  const { sessionId, anchorChampionIds, champions, items, deps } = opts;
+  const { aiProvider, allChampions, updateSession } = deps;
+  // These composables don't use Vue context — safe to call inside watch
   const history = useChatHistory(sessionId);
   const promptBuilder = useChatPromptBuilder();
-  const { champions: allChampions } = useGsData();
-  const { updateSession } = useChatSessions();
 
   const isStreaming = ref(false);
   const streamingContent = ref("");
