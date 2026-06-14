@@ -10,6 +10,7 @@
 | Name | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | `unit` | `TeamUnit` | ✅ | — | unit บนบอร์ด |
+| `readOnly` | `boolean` | — | `false` | ปิด drag และใช้ eager loading — ใช้ใน preview context |
 
 ## Emits
 
@@ -20,7 +21,7 @@
 ## Behavior
 
 - แสดงปุ่มลบเมื่อ hover
-- สามารถลาก (draggable) เพื่อย้ายตำแหน่งหรือสลับแชมป์บนบอร์ด
+- สามารถลาก (draggable) เพื่อย้ายตำแหน่งหรือสลับแชมป์บนบอร์ด — ถูกปิดเมื่อ `readOnly`
 - ชื่อแชมป์แสดงที่ด้านล่างพร้อม gradient overlay
 - Cost badge มุมบนขวา
 - `data-testid="unit-token"`, `data-testid="remove-unit-button"`

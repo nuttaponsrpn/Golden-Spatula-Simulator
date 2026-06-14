@@ -29,6 +29,7 @@
             :is-dragging-board-unit="false"
             :is-drag-source="false"
             :is-dragging-champion="false"
+            :read-only="true"
             @click="() => {}"
             @remove="() => {}"
             @drag-enter="() => {}"

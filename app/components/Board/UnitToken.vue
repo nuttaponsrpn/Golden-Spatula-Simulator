@@ -3,25 +3,18 @@
     ref="tokenRef"
     class="group relative flex h-full w-full flex-col items-center justify-center"
     data-testid="unit-token"
-    draggable="true"
+    :draggable="!readOnly"
     @mouseenter="onMouseEnter"
     @mouseleave="showTooltip = false"
-    @dragstart="
-      showTooltip = false;
-      onTokenDragStart($event, {
-        kind: 'board',
-        championId: unit.championId,
-        unitId: unit.id,
-      })
-    "
-    @dragend="onTokenDragEnd($event)"
+    @dragstart="!readOnly && (showTooltip = false, onTokenDragStart($event, { kind: 'board', championId: unit.championId, unitId: unit.id }))"
+    @dragend="!readOnly && onTokenDragEnd($event)"
   >
     <img
       v-if="champion?.imageUrl"
       :src="champion.imageUrl"
       :alt="champion.name"
       class="h-full w-full object-cover"
-      loading="lazy"
+      :loading="readOnly ? 'eager' : 'lazy'"
       @error="onImageError"
     />
     <div
@@ -50,6 +43,7 @@ import type { TeamUnit } from "~/types/team";
 
 const props = defineProps<{
   unit: TeamUnit;
+  readOnly?: boolean;
 }>();
 
 const { onTokenDragStart, onTokenDragEnd } = useDragDrop();
@@ -61,6 +55,7 @@ const showTooltip = ref(false);
 const tooltipPos = ref<{ x: number; y: number } | null>(null);
 
 function onMouseEnter(): void {
+  if (window.matchMedia("(hover: none)").matches) return;
   if (!tokenRef.value) return;
   const rect = tokenRef.value.getBoundingClientRect();
   const TOOLTIP_WIDTH = 288; // w-72 = 18rem = 288px

@@ -14,6 +14,7 @@
 | `isDraggingBoardUnit` | `boolean` | — | `false` | เปิด swap icon overlay บน occupied cells |
 | `isDragSource` | `boolean` | — | `false` | cell นี้คือต้นทางของ drag — ซ่อน swap icon |
 | `isDraggingChampion` | `boolean` | — | `false` | เปิด subtle white fill บน empty cells ขณะ drag |
+| `readOnly` | `boolean` | — | `false` | ส่งต่อให้ `BoardUnitToken` เพื่อปิด drag — ใช้ใน preview context |
 
 ## Emits
 

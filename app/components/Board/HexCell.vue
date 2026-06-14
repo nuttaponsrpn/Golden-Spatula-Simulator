@@ -63,6 +63,7 @@
       <BoardUnitToken
         v-if="cell.status === 'occupied'"
         :unit="cell.unit"
+        :read-only="readOnly"
         @remove="$emit('remove', $event)"
       />
 
@@ -176,6 +177,7 @@ const props = defineProps<{
   isDraggingBoardUnit?: boolean;
   isDragSource?: boolean;
   isDraggingChampion?: boolean;
+  readOnly?: boolean;
 }>();
 
 const { getChampionById } = useChampions();

@@ -91,6 +91,7 @@ const COST_COLORS: Record<number, string> = {
 const costBorderColor = computed(() => COST_COLORS[props.champion.cost] ?? '#9e9e9e');
 
 function onMouseEnter(): void {
+  if (window.matchMedia("(hover: none)").matches) return;
   if (!cardRef.value) return;
   const rect = cardRef.value.getBoundingClientRect();
   const TOOLTIP_WIDTH = 224;
