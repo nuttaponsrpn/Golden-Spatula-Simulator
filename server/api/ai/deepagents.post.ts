@@ -1,5 +1,8 @@
 import { createDeepAgent } from "deepagents";
 import { HumanMessage, AIMessage } from "@langchain/core/messages";
+// Static import so @vercel/nft traces this package into the deployment bundle
+// (langchain loads it dynamically by provider prefix — not detectable without this)
+import "@langchain/google-genai";
 import {
   createError,
   defineEventHandler,

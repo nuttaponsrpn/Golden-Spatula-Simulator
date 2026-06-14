@@ -71,10 +71,5 @@ export default defineNuxtConfig({
         "/api/ai/deepagents": { maxDuration: 300 },
       },
     },
-    // Force Vercel's file tracer to include packages that langchain imports dynamically
-    // (dynamic require → not detectable by static analysis → excluded from deployment)
-    externals: {
-      traceInclude: ["@langchain/google-genai"],
-    },
   },
 });
