@@ -33,7 +33,14 @@
           ใช้ Gemini API key จาก environment ของโปรเจค (gemini-2.5-pro)
         </div>
 
-        <div v-if="draft.kind !== 'gemini-default'" class="flex flex-col gap-1.5">
+        <div
+          v-else-if="draft.kind === 'deepagents'"
+          class="rounded-lg border border-blue-800 bg-blue-950/40 px-3 py-2 text-xs text-blue-300"
+        >
+          ใช้ DeepAgents พร้อม Gemini API key จาก environment (gemini-2.5-pro + tool use)
+        </div>
+
+        <div v-if="draft.kind !== 'gemini-default' && draft.kind !== 'deepagents'" class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-gray-400">API Key</label>
           <ElementBaseInput
             v-model="draft.apiKey"
@@ -52,7 +59,7 @@
           />
         </div>
 
-        <div v-if="draft.kind !== 'gemini-default'" class="flex flex-col gap-1.5">
+        <div v-if="draft.kind !== 'gemini-default' && draft.kind !== 'deepagents'" class="flex flex-col gap-1.5">
           <label class="text-xs font-medium text-gray-400">
             Model (ไม่บังคับ)
           </label>
@@ -116,6 +123,7 @@ watch(open, (val) => {
 
 const providerOptions = computed(() => [
   { value: "gemini-default", label: "Gemini — Default (Google)", disabled: !hasDefaultGemini.value },
+  { value: "deepagents", label: "DeepAgents + Gemini Default", disabled: !hasDefaultGemini.value },
   { value: "claude", label: "Claude (Anthropic)" },
   { value: "gemini", label: "Gemini (Google)" },
   { value: "copilot", label: "Copilot / OpenAI-compatible" },
@@ -123,10 +131,10 @@ const providerOptions = computed(() => [
 
 const allProviderLabels: Record<AiProviderKind, string> = {
   "gemini-default": "Gemini — Default",
+  deepagents: "DeepAgents + Gemini Default",
   claude: "Claude (Anthropic)",
   gemini: "Gemini (Google)",
   copilot: "Copilot / OpenAI-compatible",
-  deepagents: "DeepAgents (Anthropic)",
 };
 
 const providerLabel = computed(() =>
@@ -143,19 +151,20 @@ const defaultModelHint = computed(() => {
     case "copilot":
       return "gpt-4o (default)";
     case "deepagents":
-      return "claude-sonnet-4-6 (default)";
+      return "";
   }
 });
 
 const canSave = computed(() =>
-  draft.kind === "gemini-default" ? true : !!draft.apiKey.trim(),
+  draft.kind === "gemini-default" || draft.kind === "deepagents" ? true : !!draft.apiKey.trim(),
 );
 
 function save(): void {
+  const serverSide = draft.kind === "gemini-default" || draft.kind === "deepagents";
   setConfig({
     kind: draft.kind,
-    apiKey: draft.kind === "gemini-default" ? "" : draft.apiKey.trim(),
-    model: draft.kind === "gemini-default" ? undefined : (draft.model.trim() || undefined),
+    apiKey: serverSide ? "" : draft.apiKey.trim(),
+    model: serverSide ? undefined : (draft.model.trim() || undefined),
     baseUrl: draft.baseUrl.trim() || undefined,
   });
   open.value = false;

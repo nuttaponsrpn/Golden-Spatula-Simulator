@@ -1,15 +1,6 @@
-import { createDeepAgent } from "deepagents";
-import { HumanMessage, AIMessage } from "@langchain/core/messages";
-import { createGsTools } from "~/utils/gs-tools";
 import type { AiProvider, AiProviderConfig, AiMessage } from "~/types/ai-provider";
 
-function toLangChainMessages(messages: AiMessage[]): Array<HumanMessage | AIMessage> {
-  return messages.map((m) =>
-    m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content),
-  );
-}
-
-export function createDeepAgentsProvider(config: AiProviderConfig): AiProvider {
+export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider {
   return {
     kind: "deepagents" as const,
 
@@ -18,37 +9,46 @@ export function createDeepAgentsProvider(config: AiProviderConfig): AiProvider {
       systemPrompt: string,
       signal?: AbortSignal,
     ): AsyncIterableIterator<string> {
-      const runtimeConfig = useRuntimeConfig();
-      const tools = createGsTools(runtimeConfig.public.apiBase);
-
-      const agent = createDeepAgent({
-        model: `anthropic:${config.model ?? "claude-sonnet-4-6"}`,
-        tools,
-        systemPrompt,
-        permissions: [],
+      const response = await fetch("/api/ai/deepagents", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messages, systemPrompt }),
+        signal,
       });
 
-      const lcMessages = toLangChainMessages(messages);
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        throw new Error(`DeepAgents provider error ${response.status}: ${errText}`);
+      }
 
-      const run = await agent.streamEvents(
-        { messages: lcMessages },
-        { version: "v3", signal },
-      );
+      if (!response.body) throw new Error("DeepAgents provider returned no body");
 
-      // Consume tool calls in parallel (fire-and-forget) — reserved for
-      // ThinkingPanel wiring in a future phase
-      (async () => {
-        for await (const _call of run.toolCalls) {
-          // tool call events collected here
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6).trim();
+            try {
+              const token = JSON.parse(data) as string;
+              if (token) yield token;
+            } catch {
+              // skip malformed line
+            }
+          }
         }
-      })().catch(() => {
-        /* ignore tool call iteration errors */
-      });
-
-      for await (const msg of run.messages) {
-        for await (const token of msg.text) {
-          yield token;
-        }
+      } finally {
+        reader.releaseLock();
       }
     },
   };

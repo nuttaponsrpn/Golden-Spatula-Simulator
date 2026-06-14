@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@langchain/core": "^1.1.49",
+    "@langchain/google-genai": "^2.1.31",
     "deepagents": "^1.10.2",
     "nuxt": "^4.4.6",
     "vue": "^3.5.34",
