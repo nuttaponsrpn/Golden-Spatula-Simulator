@@ -46,6 +46,14 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
                 if (event.payload) yield event.payload;
               } else if (event.type === "tool_call" && opts?.onToolCall) {
                 opts.onToolCall(event.payload as ToolCallStep);
+              } else if (event.type === "error") {
+                const msg =
+                  typeof event.payload === "object" &&
+                  event.payload !== null &&
+                  "message" in event.payload
+                    ? String((event.payload as { message: unknown }).message)
+                    : "DeepAgents stream error";
+                throw new Error(msg);
               }
             } catch {
               // skip malformed line

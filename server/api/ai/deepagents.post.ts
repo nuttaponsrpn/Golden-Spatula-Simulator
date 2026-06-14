@@ -115,6 +115,8 @@ export default defineEventHandler(async (event) => {
       }
     } catch (err) {
       console.error("[deepagents] stream error:", err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      pushEvent("error", { message: errMsg });
     } finally {
       closeStream();
     }
