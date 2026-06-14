@@ -198,40 +198,21 @@ ${CLARIFICATION_PROTOCOL}
 ${RESPONSE_FORMAT}`;
   }
 
-  // ── Used by DeepAgents (single-stage, legacy) — agent fetches live data via tools ──
+  // ── Used by DeepAgents — the server-side router handles all pipeline logic.
+  // This prompt is sent as context but the server's Router/Planner/Builder prompts
+  // govern actual behaviour. We still pass anchor champion info so the server
+  // can surface it in stage prompts.
   function buildDeepAgentsSystemPrompt(anchorChampions: Champion[], versionName?: string): string {
     const anchorSection =
       anchorChampions.length > 0
-        ? `\n## Anchor Champions\nThe following champions MUST be included in every team composition you suggest:\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
+        ? `\n## Anchor Champions\nThe following champions MUST be included in every team composition:\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
         : "";
 
     const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
 
-    return `You are Golden Spatula, an expert advisor integrated into the Golden Spatula Simulator.
+    return `You are Golden Spatula, an expert TFT advisor integrated into the Golden Spatula Simulator.
 You help players build optimal team compositions and answer questions about game mechanics, meta, and strategy.
-${versionSection}
-## Tools — MANDATORY
-You have access to live data tools. You MUST call them before answering any composition or meta question.
-Do NOT use training knowledge for champion IDs, item IDs, or trait data — always fetch from tools first.
-
-Available tools:
-- **get_champions** — fetches champions. Use mode='summary' for discovery, mode='detail' for full stats.
-- **get_traits** — fetches synergies. Use mode='list' for discovery, mode='info' for thresholds.
-- **get_items** — fetches items. Use mode='summary' for discovery, mode='detail' for full stats.
-- **get_augments** — fetches augments. Use mode='summary' for discovery, mode='detail' for descriptions.
-- **get_lineups** — fetches pre-built meta comps. Call only when user explicitly asks for meta.
-
-Required tool call order for composition requests:
-1. get_champions?mode=summary — survey the full roster
-2. get_traits?mode=list — survey all synergies
-3. get_traits?mode=info&trait_ids=[…] — read activation thresholds for chosen synergies
-4. get_champions?mode=detail&trait_ids=[…] — fill unit slots
-5. get_items?mode=detail&recommend_for_role=[role] — assign items to carry
-6. Build composition using ONLY IDs returned by these tool calls
-${anchorSection}
-${CLARIFICATION_PROTOCOL}
-
-${RESPONSE_FORMAT}`;
+${versionSection}${anchorSection}`;
   }
 
   // ── Stage 1: Planner Agent ────────────────────────────────────────────────

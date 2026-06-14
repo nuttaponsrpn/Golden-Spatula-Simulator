@@ -13,10 +13,19 @@ import {
 } from "h3";
 import { createGsTools } from "~/utils/gs-tools";
 import { fetchVersionByMode } from "../../utils/gsVersion";
-import { buildPlannerPrompt, buildBuilderPrompt } from "../../utils/gsPromptBuilder";
+import {
+  buildRouterPrompt,
+  buildPlannerProposePrompt,
+  buildPlannerBuildPrompt,
+  buildAnswerPrompt,
+  buildClarifyPrompt,
+  buildBuilderPrompt,
+} from "../../utils/gsPromptBuilder";
 
 // Allow up to 300s on Vercel Pro (long-running AI response)
 export const maxDuration = 300;
+
+type DeepAgentIntent = "build_team" | "answer_question" | "confirm_intent" | "clarify";
 
 interface DeepAgentsRequestBody {
   messages: { role: "user" | "assistant"; content: string }[];
@@ -54,7 +63,6 @@ export default defineEventHandler(async (event) => {
   const tools = createGsTools(apiBase, body.activeMode);
 
   // ── Stage 0: Version Bootstrap ──────────────────────────────────────────
-  // Resolve the version name for context so prompts can reference it.
   let versionName: string | undefined;
   try {
     const version = await fetchVersionByMode(body.activeMode ?? "17");
@@ -63,12 +71,19 @@ export default defineEventHandler(async (event) => {
     // Non-fatal — prompts work without a version name
   }
 
-  // Anchor champions from the client (already resolved by the UI)
   const anchorChampions = (body.anchorChampions ?? []) as { id: string; name: string }[];
 
   const lcMessages = body.messages.map((m) =>
     m.role === "user" ? new HumanMessage(m.content) : new AIMessage(m.content),
   );
+
+  // The latest user message (used by the router and for context)
+  const latestUserMessage = [...body.messages].reverse().find((m) => m.role === "user");
+  const latestUserText = latestUserMessage?.content ?? "";
+
+  // The previous assistant message — used to detect if Propose-phase output is available
+  const latestAssistantMessage = [...body.messages].reverse().find((m) => m.role === "assistant");
+  const latestAssistantText = latestAssistantMessage?.content ?? "";
 
   // ── SSE stream setup ────────────────────────────────────────────────────
   const encoder = new TextEncoder();
@@ -116,101 +131,170 @@ export default defineEventHandler(async (event) => {
     })().catch((err) => console.error("[deepagents] toolCalls error:", err));
   }
 
+  // Collect all streamed tokens from a run into a string
+  async function collectRunText(run: { messages: AsyncIterable<{ text: AsyncIterable<string> }> }): Promise<string> {
+    let output = "";
+    for await (const msg of run.messages) {
+      for await (const token of msg.text) {
+        if (token) output += token;
+      }
+    }
+    await (run as unknown as { output: Promise<unknown> }).output;
+    return output;
+  }
+
+  // Stream tokens from a run to the client
+  async function streamRunToClient(run: { messages: AsyncIterable<{ text: AsyncIterable<string> }> }): Promise<string> {
+    let output = "";
+    for await (const msg of run.messages) {
+      for await (const token of msg.text) {
+        if (token) {
+          output += token;
+          pushEvent("token", token);
+        }
+      }
+    }
+    await (run as unknown as { output: Promise<unknown> }).output;
+    return output;
+  }
+
   // ── Main pipeline ────────────────────────────────────────────────────────
   (async () => {
     const t0 = Date.now();
     const elapsed = () => `+${((Date.now() - t0) / 1000).toFixed(1)}s`;
 
     try {
-      // ── Stage 1: Planner ───────────────────────────────────────────────
-      console.log(`[deepagents][${elapsed()}] stage:planner — createDeepAgent`);
-      pushEvent("stage", { stage: "planner", label: "วิเคราะห์ทีม..." });
+      // ── Stage 1: Router ─────────────────────────────────────────────────
+      console.log(`[deepagents][${elapsed()}] stage:router — classify intent`);
+      pushEvent("stage", { stage: "router", label: "วิเคราะห์คำขอ..." });
 
-      const plannerPrompt = buildPlannerPrompt({
-        versionName,
-        anchorChampions,
-      });
+      const routerPrompt = buildRouterPrompt({ versionName, anchorChampions });
 
-      const plannerAgent = createDeepAgent({
-        model: "google-genai:gemini-2.5-pro",
-        tools,
-        systemPrompt: plannerPrompt,
+      const routerAgent = createDeepAgent({
+        model: "google-genai:gemini-2.5-flash",
+        tools: [],
+        systemPrompt: routerPrompt,
         permissions: [],
       });
 
-      console.log(`[deepagents][${elapsed()}] planner — calling streamEvents`);
-      const plannerRun = await plannerAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
-      console.log(`[deepagents][${elapsed()}] planner — streamEvents returned, iterating messages`);
-      const plannerRunAny = plannerRun as unknown as Record<string, unknown>;
-      console.log(`[deepagents] plannerRun keys:`, Object.keys(plannerRunAny));
-      console.log(`[deepagents] plannerRun.messages type:`, typeof plannerRunAny.messages);
-      console.log(`[deepagents] plannerRun.messages value:`, plannerRunAny.messages);
-      for (const key of Object.keys(plannerRunAny)) {
-        const val = plannerRunAny[key];
-        const isAsyncIter = val != null && typeof (val as { [Symbol.asyncIterator]?: unknown })[Symbol.asyncIterator] === "function";
-        console.log(`[deepagents]   .${key} → type:${typeof val}, isAsyncIterable:${isAsyncIter}`);
-      }
-      wireToolCallEvents(plannerRun);
+      const routerRun = await routerAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
+      const routerOutput = await collectRunText(routerRun);
 
-      // Collect the full planner text output before starting the Builder
-      let plannerOutput = "";
-      let plannerMsgCount = 0;
-      for await (const msg of plannerRun.messages) {
-        plannerMsgCount++;
-        const msgAny = msg as unknown as Record<string, unknown>;
-        console.log(`[deepagents][${elapsed()}] planner — msg #${plannerMsgCount} node:${String(msgAny.node)} namespace:${JSON.stringify(msgAny.namespace)}`);
-        let tokenCount = 0;
-        for await (const token of msg.text) {
-          if (token) {
-            plannerOutput += token;
-            tokenCount++;
-            if (tokenCount === 1) console.log(`[deepagents][${elapsed()}] planner — FIRST TOKEN in msg #${plannerMsgCount}`);
-            // Planner output is internal JSON — do not stream to client
-          }
+      // Parse intent from router JSON output
+      let intent: DeepAgentIntent = "build_team";
+      try {
+        const cleaned = routerOutput.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/i, "").trim();
+        const parsed = JSON.parse(cleaned) as { intent?: string; reasoning?: string };
+        if (
+          parsed.intent === "build_team" ||
+          parsed.intent === "answer_question" ||
+          parsed.intent === "confirm_intent" ||
+          parsed.intent === "clarify"
+        ) {
+          intent = parsed.intent;
         }
-        console.log(`[deepagents][${elapsed()}] planner — msg #${plannerMsgCount} done (tokens: ${tokenCount})`);
+        console.log(`[deepagents][${elapsed()}] router — intent: ${intent} | reasoning: ${parsed.reasoning ?? ""}`);
+      } catch {
+        console.warn(`[deepagents][${elapsed()}] router — failed to parse intent, defaulting to build_team`);
       }
-      console.log(`[deepagents][${elapsed()}] planner — messages loop DONE (total msgs: ${plannerMsgCount})`);
-      console.log(`[deepagents][${elapsed()}] planner — awaiting run.output...`);
-      const plannerFinalState = await (plannerRun as unknown as { output: Promise<unknown> }).output;
-      console.log(`[deepagents][${elapsed()}] planner — run.output resolved:`, JSON.stringify(plannerFinalState).slice(0, 500));
 
-      // ── Stage 2: Builder ───────────────────────────────────────────────
-      console.log(`[deepagents][${elapsed()}] stage:builder — createDeepAgent`);
-      pushEvent("stage", { stage: "builder", label: "สร้างทีม..." });
+      // ── Dispatch by intent ───────────────────────────────────────────────
 
-      const builderPrompt = buildBuilderPrompt({
-        versionName,
-        plannerOutput,
-      });
+      if (intent === "answer_question") {
+        // ── Fast path: single answer agent ────────────────────────────────
+        console.log(`[deepagents][${elapsed()}] stage:answer — fast path`);
+        pushEvent("stage", { stage: "answer", label: "กำลังตอบ..." });
 
-      const builderAgent = createDeepAgent({
-        model: "google-genai:gemini-2.5-pro",
-        tools,
-        systemPrompt: builderPrompt,
-        permissions: [],
-      });
+        const answerAgent = createDeepAgent({
+          model: "google-genai:gemini-2.5-flash",
+          tools,
+          systemPrompt: buildAnswerPrompt({ versionName }),
+          permissions: [],
+        });
 
-      console.log(`[deepagents][${elapsed()}] builder — calling streamEvents`);
-      // Builder receives planner output as the user message — Gemini requires at least one content item
-      const builderMessages = [new HumanMessage(plannerOutput || "สร้างทีม TFT ตามแผนที่วางไว้")];
-      const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
-      console.log(`[deepagents][${elapsed()}] builder — streamEvents returned, iterating messages`);
-      wireToolCallEvents(builderRun);
+        const answerRun = await answerAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
+        wireToolCallEvents(answerRun);
+        await streamRunToClient(answerRun);
 
-      // Stream builder tokens to the client
-      let builderTokenCount = 0;
-      for await (const msg of builderRun.messages) {
-        console.log(`[deepagents][${elapsed()}] builder — new message chunk`);
-        for await (const token of msg.text) {
-          if (token) {
-            builderTokenCount++;
-            if (builderTokenCount === 1) console.log(`[deepagents][${elapsed()}] builder — FIRST TOKEN received`);
-            pushEvent("token", token);
-          }
-        }
+      } else if (intent === "clarify") {
+        // ── Clarify path: ask focused questions ───────────────────────────
+        console.log(`[deepagents][${elapsed()}] stage:clarify — asking questions`);
+        pushEvent("stage", { stage: "clarify", label: "ขอข้อมูลเพิ่มเติม..." });
+
+        const clarifyAgent = createDeepAgent({
+          model: "google-genai:gemini-2.5-flash",
+          tools: [],
+          systemPrompt: buildClarifyPrompt({ versionName }),
+          permissions: [],
+        });
+
+        const clarifyRun = await clarifyAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
+        await streamRunToClient(clarifyRun);
+
+      } else if (intent === "confirm_intent") {
+        // ── Confirm path: extract selected plan from previous Propose output → Builder ──
+        console.log(`[deepagents][${elapsed()}] stage:plan — user confirmed, building team`);
+        pushEvent("stage", { stage: "plan", label: "สร้างทีมตามที่เลือก..." });
+
+        // The Planner-Build phase is a lightweight LLM call (no tools) that extracts
+        // the user's chosen option from the previous Propose-phase JSON.
+        const plannerBuildAgent = createDeepAgent({
+          model: "google-genai:gemini-2.5-flash",
+          tools: [],
+          systemPrompt: buildPlannerBuildPrompt({
+            versionName,
+            proposerOutput: latestAssistantText,
+            userSelection: latestUserText,
+          }),
+          permissions: [],
+        });
+
+        const plannerBuildRun = await plannerBuildAgent.streamEvents(
+          { messages: [new HumanMessage(latestUserText)] },
+          { version: "v3" },
+        );
+        const selectedPlanJson = await collectRunText(plannerBuildRun);
+        console.log(`[deepagents][${elapsed()}] plan — extracted plan: ${selectedPlanJson.slice(0, 200)}`);
+
+        // ── Builder receives the selected plan ────────────────────────────
+        pushEvent("stage", { stage: "builder", label: "สร้างทีม..." });
+
+        const builderPromptText = buildBuilderPrompt({
+          versionName,
+          plannerOutput: selectedPlanJson || latestAssistantText,
+        });
+
+        const builderAgent = createDeepAgent({
+          model: "google-genai:gemini-2.5-pro",
+          tools,
+          systemPrompt: builderPromptText,
+          permissions: [],
+        });
+
+        const builderMessages = [new HumanMessage(selectedPlanJson || "สร้างทีม TFT ตามแผนที่เลือก")];
+        const builderRun = await builderAgent.streamEvents({ messages: builderMessages }, { version: "v3" });
+        wireToolCallEvents(builderRun);
+        await streamRunToClient(builderRun);
+
+      } else {
+        // ── build_team path: Propose phase → stream options to user ───────
+        console.log(`[deepagents][${elapsed()}] stage:propose — surveying pool`);
+        pushEvent("stage", { stage: "propose", label: "วิเคราะห์ทีมที่เป็นไปได้..." });
+
+        const proposeAgent = createDeepAgent({
+          model: "google-genai:gemini-2.5-pro",
+          tools,
+          systemPrompt: buildPlannerProposePrompt({ versionName, anchorChampions }),
+          permissions: [],
+        });
+
+        const proposeRun = await proposeAgent.streamEvents({ messages: lcMessages }, { version: "v3" });
+        wireToolCallEvents(proposeRun);
+        // Stream propose options directly to the client so user can pick A/B/C
+        await streamRunToClient(proposeRun);
+        console.log(`[deepagents][${elapsed()}] propose — COMPLETE`);
       }
-      console.log(`[deepagents][${elapsed()}] builder — COMPLETE (total tokens: ${builderTokenCount})`);
+
     } catch (err) {
       console.error("[deepagents] pipeline error:", err);
       const errMsg = err instanceof Error ? err.message : String(err);

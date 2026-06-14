@@ -66,3 +66,17 @@ export type AiResponseParseResult =
   | { kind: "team-comp"; data: AiTeamCompResponse; title: string; text?: string }
   | { kind: "text-only"; title: string; text?: string }
   | { kind: "unparsed" }; // streaming text that could not be parsed yet
+
+// ── Intent routing (DeepAgents two-phase Planner) ──────────────────────────
+// Determined by the Router agent before the pipeline starts.
+export type DeepAgentIntent =
+  | "build_team"      // user wants a full team composition built
+  | "answer_question" // factual/meta/mechanics question — no comp needed
+  | "confirm_intent"  // user is confirming / selecting a proposed strategy (A/B/C)
+  | "clarify";        // request is too vague — ask focused questions first
+
+// What the Router agent returns as structured JSON
+export interface RouterOutput {
+  intent: DeepAgentIntent;
+  reasoning: string; // 1 sentence explaining the classification
+}

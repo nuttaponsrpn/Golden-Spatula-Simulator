@@ -1,4 +1,4 @@
-// Server-side prompt builders for the two-stage Planner → Builder pipeline.
+// Server-side prompt builders for the intent-routed, two-phase Planner → Builder pipeline.
 // These are pure functions — no Vue or Nuxt dependencies.
 
 interface AnchorChampion {
@@ -6,6 +6,28 @@ interface AnchorChampion {
   name: string;
 }
 
+export interface RouterPromptOptions {
+  versionName?: string;
+  anchorChampions?: AnchorChampion[];
+}
+
+export interface PlannerProposeOptions {
+  versionName?: string;
+  anchorChampions?: AnchorChampion[];
+}
+
+export interface PlannerBuildOptions {
+  versionName?: string;
+  anchorChampions?: AnchorChampion[];
+  proposerOutput: string;  // full Propose-phase text (with A/B/C options)
+  userSelection: string;   // the user's confirm message (e.g. "เลือก B")
+}
+
+export interface AnswerPromptOptions {
+  versionName?: string;
+}
+
+// Keep existing exports for backward compatibility
 export interface PlannerPromptOptions {
   versionName?: string;
   anchorChampions?: AnchorChampion[];
@@ -130,6 +152,171 @@ You MUST call tools in this exact order before producing output:
 - If an anchor champion is set, set it as carry unconditionally; read its skillDesc to determine role
 ${anchorSection}
 ${PLANNER_OUTPUT_SCHEMA}`;
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+// Lightweight classifier — no tools, just reads the conversation and outputs intent JSON.
+export function buildRouterPrompt(opts: RouterPromptOptions): string {
+  const { versionName, anchorChampions = [] } = opts;
+  const versionSection = versionName ? `Current game version: "${versionName}"\n` : "";
+  const anchorSection =
+    anchorChampions.length > 0
+      ? `Anchor champions (user wants these in the team): ${anchorChampions.map((c) => c.name).join(", ")}\n`
+      : "";
+
+  return `You are an intent classifier for a TFT (Teamfight Tactics) assistant chatbot.
+${versionSection}${anchorSection}
+## Task
+Read the conversation history and the latest user message. Classify the user's intent into EXACTLY ONE of these four categories:
+
+- **build_team** — user wants a new team composition built from scratch (first request, or a clearly new direction)
+- **answer_question** — user is asking a factual, meta, or mechanics question that does NOT require building a comp (e.g. "how does Rapidfire work?", "which carry is best right now?")
+- **confirm_intent** — user is CONFIRMING or SELECTING one of the A/B/C strategy options that were already proposed in the previous assistant message (e.g. "เลือก A", "ขอแบบ B", "B ครับ", "option 2", "go with C")
+- **clarify** — the user's request is too vague or ambiguous to route — you need to ask 1-2 focused questions
+
+## Rules
+- If the previous assistant message contained strategy options labelled A, B, or C and the user is choosing one → always classify as **confirm_intent**
+- Short affirmative messages like "ใช่", "โอเค", "ทำเลย", "สร้างเลย" after options were proposed → **confirm_intent**
+- Questions about synergies, items, or meta that don't ask to build a team → **answer_question**
+- When unsure between build_team and clarify → prefer **clarify** (better to ask than guess)
+
+## Output
+Respond with a single JSON object. No markdown. No extra text.
+{ "intent": "build_team | answer_question | confirm_intent | clarify", "reasoning": "one sentence" }`;
+}
+
+// ── Planner — Propose phase ───────────────────────────────────────────────────
+// Surveys the pool and presents A/B/C strategy options to the user.
+// Does NOT fill unit slots — that is the Builder's job after the user selects.
+export function buildPlannerProposePrompt(opts: PlannerProposeOptions): string {
+  const { versionName, anchorChampions = [] } = opts;
+  const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+  const anchorSection =
+    anchorChampions.length > 0
+      ? `\n## Anchor Champions (MUST appear in every strategy option)\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
+      : "";
+
+  return `You are the Planner (Propose phase) of a two-stage TFT team composition builder.
+Your job is to survey the champion pool and synergies, then PROPOSE 3 distinct strategy options (A, B, C) for the user to choose from.
+You do NOT fill unit slots — that is the Builder's job after the user selects an option.
+${versionSection}
+## Mandatory Tool Call Order
+You MUST call tools in this exact order before producing output:
+1. get_version — confirm the active game version name and id
+2. get_traits?mode=list — get all available synergy IDs for this version
+3. get_champions?mode=summary — survey the full champion roster (id, name, cost, traitIds)
+4. If an anchor champion is specified → get_champions?mode=detail&names=[anchor] to read skillDesc and confirm carry role
+
+## CRITICAL: Trait ID Rules
+- All trait IDs in your options MUST come directly from the get_traits tool response
+- NEVER guess or invent trait IDs — they change between game versions
+
+## Rules
+- Do NOT call get_lineups — derive strategies purely from champion pool and synergy data
+- Each option must be genuinely different: different carry, different primary synergy, or different playstyle
+- targetSynergies must be achievable (enough champions in the pool to meet the activation threshold)
+- Include fallbackSynergies for each option so the Builder can recover if a pool is too small
+- If an anchor champion is specified, it MUST appear as the carry or a core support in every option
+${anchorSection}
+## Output Format
+Respond with a JSON object containing the propose text AND the raw plan data for each option.
+No markdown code blocks. No text outside the JSON.
+
+{
+  "title": "Short Thai session title (5-8 words)",
+  "text": "Thai-language text presenting the 3 options in chat format:\n**A. [Option Name]** — [1-2 sentence description of playstyle and core synergy]\n**B. [Option Name]** — [1-2 sentence description]\n**C. [Option Name]** — [1-2 sentence description]\n\nเลือกแบบไหนดีครับ? 😊",
+  "options": {
+    "A": {
+      "carry": { "id": "champion_id", "name": "Name", "cost": 4, "damageType": "physical | magic | hybrid", "role": "AD_Carry | AP_Carry | Tank | Utility" },
+      "targetSynergies": ["trait_id_1", "trait_id_2"],
+      "fallbackSynergies": ["trait_id_3"],
+      "costCurve": { "1cost": 2, "2cost": 3, "3cost": 3, "4cost": 2 }
+    },
+    "B": { ... },
+    "C": { ... }
+  }
+}
+
+Rules for the options object:
+- All champion and trait IDs MUST come from tool responses
+- costCurve values for each option must sum to exactly 10
+- Do NOT include individual unit slot assignments`;
+}
+
+// ── Planner — Build phase (confirm_intent path) ───────────────────────────────
+// Receives the Propose-phase output + user's selection → injects selected plan into Builder.
+// This function extracts the correct option plan from the proposer output.
+export function buildPlannerBuildPrompt(opts: PlannerBuildOptions): string {
+  const { versionName, proposerOutput, userSelection } = opts;
+  const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+
+  return `You are the Planner (Build phase) of a two-stage TFT team composition builder.
+The user has reviewed strategy options (A, B, C) and selected one.
+Your job is to extract the correct option plan from the Proposer's output and produce the Planner JSON that the Builder will use.
+${versionSection}
+## Proposer's Output (contains all three options)
+${proposerOutput}
+
+## User's Selection
+"${userSelection}"
+
+## Task
+1. Identify which option (A, B, or C) the user selected from their message
+2. Extract the plan object for that option from the "options" field above
+3. Output ONLY the plan for the selected option as a Planner JSON object
+
+## Output Schema
+Output a single valid JSON object. No markdown. No extra text.
+{
+  "carry": { "id": "...", "name": "...", "cost": N, "damageType": "...", "role": "..." },
+  "targetSynergies": ["..."],
+  "fallbackSynergies": ["..."],
+  "costCurve": { "1cost": N, "2cost": N, "3cost": N, "4cost": N }
+}`;
+}
+
+// ── Answer agent ──────────────────────────────────────────────────────────────
+// Handles answer_question intent — no tools needed for most questions.
+export function buildAnswerPrompt(opts: AnswerPromptOptions): string {
+  const { versionName } = opts;
+  const versionSection = versionName ? `\nCurrent game version: "${versionName}"\n` : "";
+
+  return `You are Golden Spatula, an expert TFT (Teamfight Tactics) advisor.
+${versionSection}
+The user has asked a question about game mechanics, meta, synergies, items, or strategy.
+Answer concisely and helpfully. You may use the get_traits, get_champions, get_items, or get_augments tools if you need to look up specific current data, but for general questions answer directly from your knowledge.
+
+## Output Format
+Respond with a single JSON object. No markdown code blocks. No text outside the JSON.
+{
+  "title": "Short Thai session title (5-8 words)",
+  "text": "Your full answer here in plain conversational Thai or English matching the user's language"
+}`;
+}
+
+// ── Clarify agent ─────────────────────────────────────────────────────────────
+// Handles clarify intent — asks focused questions before routing to build_team.
+export function buildClarifyPrompt(opts: AnswerPromptOptions): string {
+  const { versionName } = opts;
+  const versionSection = versionName ? `\nCurrent game version: "${versionName}"\n` : "";
+
+  return `You are Golden Spatula, an expert TFT (Teamfight Tactics) advisor.
+${versionSection}
+The user's request was too vague to build a team composition. Ask 1-2 focused clarifying questions to narrow down what they want.
+
+Focus on the most impactful unknowns:
+- **Playstyle**: Reroll (3-star carries), Fast 8 (strong 4-cost units), Slow Roll, Hyper Roll
+- **Win condition**: Single damage carry, Tank frontline, AOE burst, Healing/sustain
+- **Cost preference**: Budget (1-2 cost reroll) vs Premium (4-5 cost carry)
+
+Keep it brief — maximum 2 questions with A/B/C options each.
+
+## Output Format
+Respond with a single JSON object. No markdown code blocks. No text outside the JSON.
+{
+  "title": "Short Thai session title (5-8 words)",
+  "text": "Your clarifying questions here with lettered options"
+}`;
 }
 
 export function buildBuilderPrompt(opts: BuilderPromptOptions): string {

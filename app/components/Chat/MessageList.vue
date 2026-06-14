@@ -24,7 +24,9 @@
             <span class="animate-bounce" style="animation-delay: 0ms">●</span>
             <span class="animate-bounce" style="animation-delay: 150ms">●</span>
             <span class="animate-bounce" style="animation-delay: 300ms">●</span>
-            <span v-if="streamingStage" class="ml-2 text-xs text-gray-500">{{ streamingStage.label }}</span>
+            <span v-if="streamingStage" class="ml-2 text-xs" :class="stageColor">
+              {{ stageIcon }} {{ streamingStage.label }}
+            </span>
           </span>
         </span>
         <span v-else>{{ streamingMessage }}</span>
@@ -46,6 +48,26 @@ const props = defineProps<{
 const completedMessages = computed(() =>
   props.messages.filter((m) => m.status !== "streaming"),
 );
+
+const STAGE_META: Record<string, { icon: string; color: string }> = {
+  router:  { icon: "🔍", color: "text-blue-400" },
+  propose: { icon: "💡", color: "text-yellow-400" },
+  plan:    { icon: "📋", color: "text-purple-400" },
+  planner: { icon: "📋", color: "text-purple-400" },
+  builder: { icon: "🔨", color: "text-orange-400" },
+  answer:  { icon: "💬", color: "text-green-400" },
+  clarify: { icon: "❓", color: "text-sky-400" },
+};
+
+const stageIcon = computed(() => {
+  const stage = props.streamingStage?.stage ?? "";
+  return STAGE_META[stage]?.icon ?? "⚙️";
+});
+
+const stageColor = computed(() => {
+  const stage = props.streamingStage?.stage ?? "";
+  return STAGE_META[stage]?.color ?? "text-gray-500";
+});
 
 const listRef = ref<HTMLElement | null>(null);
 
