@@ -10,7 +10,7 @@
         <path d="M6.5 5.75a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v2h.75a.75.75 0 0 1 0 1.5H7.25a.75.75 0 0 1 0-1.5H8v-1.25H7.25a.75.75 0 0 1-.75-.75ZM8 4a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
       </svg>
       <span class="hidden sm:inline">{{ activeVersionInfo?.name ?? `Mode ${activeMode}` }}</span>
-      <span class="sm:hidden">{{ activeVersionInfo?.version ?? activeMode }}</span>
+      <span class="sm:hidden">{{ activeVersionInfo?.name ?? activeMode }}</span>
     </button>
 
     <!-- Single modal — switches between picker and confirm views -->

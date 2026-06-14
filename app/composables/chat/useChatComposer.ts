@@ -15,6 +15,8 @@ import type { AppError } from "~/types/app-error";
 import type { Ref } from "vue";
 import { normalizeError } from "~/utils/error";
 import type { GsVersion } from "../gs/useGsData";
+import { useChatHistory } from "./useChatHistory";
+import { useChatPromptBuilder } from "./useChatPromptBuilder";
 
 // Injected dependencies — composables that require Vue setup context
 // are passed in so useChatComposer can be called inside watch callbacks
@@ -213,6 +215,7 @@ export function useChatComposer(opts: ComposerOptions) {
   const isStreaming = ref(false);
   const streamingContent = ref("");
   const streamingToolCalls = ref<ToolCallStep[]>([]);
+  const streamingStage = ref<{ stage: string; label: string } | null>(null);
 
   let abortController: AbortController | null = null;
 
@@ -260,6 +263,11 @@ export function useChatComposer(opts: ComposerOptions) {
           versionName,
         });
 
+    // Build AI message history snapshot BEFORE adding new messages to history
+    // to avoid sending duplicate user messages or empty streaming entries
+    const aiMessages = buildAiMessages();
+    aiMessages.push({ role: "user", content: userText });
+
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
@@ -285,13 +293,11 @@ export function useChatComposer(opts: ComposerOptions) {
 
     await history.addMessage(aiMsg);
 
-    const aiMessages = buildAiMessages();
-    aiMessages.push({ role: "user", content: userText });
-
     abortController = new AbortController();
     isStreaming.value = true;
     streamingContent.value = "";
     streamingToolCalls.value = [];
+    streamingStage.value = null;
 
     const providerResult = aiProvider.sendMessage(
       aiMessages,
@@ -299,6 +305,10 @@ export function useChatComposer(opts: ComposerOptions) {
       {
         signal: abortController.signal,
         activeMode: deps.activeMode.value,
+        anchorChampions: anchorChampions.map((c) => ({ id: c.id, name: c.name })),
+        onStage: (payload) => {
+          streamingStage.value = payload;
+        },
         onToolCall: (step) => {
           const existing = streamingToolCalls.value.findIndex((s) => s.id === step.id);
           if (existing >= 0) {
@@ -411,6 +421,7 @@ export function useChatComposer(opts: ComposerOptions) {
       isStreaming.value = false;
       streamingContent.value = "";
       streamingToolCalls.value = [];
+      streamingStage.value = null;
       abortController = null;
     }
   }
@@ -419,5 +430,5 @@ export function useChatComposer(opts: ComposerOptions) {
     abortController?.abort();
   }
 
-  return { sendMessage, cancelStreaming, isStreaming, streamingContent, streamingToolCalls, messages: history.messages };
+  return { sendMessage, cancelStreaming, isStreaming, streamingContent, streamingToolCalls, streamingStage, messages: history.messages };
 }

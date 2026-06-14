@@ -1,5 +1,7 @@
 import type { ChatMessage } from "~/types/chat";
 import type { AppError } from "~/types/app-error";
+import { ref } from "vue";
+import { useChatDb } from "./useChatDb";
 
 export function useChatHistory(sessionId: string) {
   const db = useChatDb();

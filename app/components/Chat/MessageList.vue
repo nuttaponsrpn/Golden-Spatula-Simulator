@@ -10,7 +10,7 @@
       :message="msg"
     />
 
-    <div v-if="streamingMessage !== null || streamingToolCalls.length > 0" class="flex flex-row gap-3">
+    <div v-if="streamingMessage !== null || streamingToolCalls.length > 0 || streamingStage !== null" class="flex flex-row gap-3">
       <div
         class="max-w-[80%] rounded-2xl rounded-tl-sm bg-gray-800 px-4 py-3 text-sm leading-relaxed text-gray-100 whitespace-pre-wrap break-words"
       >
@@ -24,6 +24,7 @@
             <span class="animate-bounce" style="animation-delay: 0ms">●</span>
             <span class="animate-bounce" style="animation-delay: 150ms">●</span>
             <span class="animate-bounce" style="animation-delay: 300ms">●</span>
+            <span v-if="streamingStage" class="ml-2 text-xs text-gray-500">{{ streamingStage.label }}</span>
           </span>
         </span>
         <span v-else>{{ streamingMessage }}</span>
@@ -39,6 +40,7 @@ const props = defineProps<{
   messages: ChatMessage[];
   streamingMessage: string | null;
   streamingToolCalls: ToolCallStep[];
+  streamingStage: { stage: string; label: string } | null;
 }>();
 
 const completedMessages = computed(() =>
