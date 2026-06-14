@@ -5,6 +5,7 @@ import { createClaudeProvider } from "./providers/claude";
 import { createGeminiProvider } from "./providers/gemini";
 import { createGeminiDefaultProvider } from "./providers/gemini-default";
 import { createCopilotProvider } from "./providers/copilot";
+import { createDeepAgentsProvider } from "./providers/deepagents";
 
 const LOCAL_STORAGE_KEY = "gs-ai-provider-config";
 
@@ -18,6 +19,8 @@ function makeProvider(config: AiProviderConfig): AiProvider {
       return createGeminiDefaultProvider();
     case "copilot":
       return createCopilotProvider(config);
+    case "deepagents":
+      return createDeepAgentsProvider(config);
   }
 }
 

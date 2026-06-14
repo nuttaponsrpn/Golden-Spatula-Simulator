@@ -1,4 +1,4 @@
-export type AiProviderKind = "claude" | "gemini" | "gemini-default" | "copilot";
+export type AiProviderKind = "claude" | "gemini" | "gemini-default" | "copilot" | "deepagents";
 
 export interface AiProviderConfig {
   kind: AiProviderKind;

@@ -126,6 +126,7 @@ const allProviderLabels: Record<AiProviderKind, string> = {
   claude: "Claude (Anthropic)",
   gemini: "Gemini (Google)",
   copilot: "Copilot / OpenAI-compatible",
+  deepagents: "DeepAgents (Anthropic)",
 };
 
 const providerLabel = computed(() =>
@@ -141,6 +142,8 @@ const defaultModelHint = computed(() => {
       return "gemini-2.5-pro (default)";
     case "copilot":
       return "gpt-4o (default)";
+    case "deepagents":
+      return "claude-sonnet-4-6 (default)";
   }
 });
 

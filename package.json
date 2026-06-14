@@ -13,9 +13,12 @@
     "gen:icons": "node scripts/gen-icons.mjs"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.49",
+    "deepagents": "^1.10.2",
     "nuxt": "^4.4.6",
     "vue": "^3.5.34",
-    "vue-router": "^5.0.7"
+    "vue-router": "^5.0.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@nuxtjs/tailwindcss": "^6.14.0",
