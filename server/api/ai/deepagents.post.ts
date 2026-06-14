@@ -22,6 +22,14 @@ interface DeepAgentsRequestBody {
   activeMode?: string;
 }
 
+interface ToolCallStreamLike {
+  readonly name: string;
+  readonly callId: string;
+  readonly input: unknown;
+  readonly output: Promise<unknown>;
+  readonly status: Promise<string>;
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig();
   if (!config.geminiApiKey) {
@@ -52,10 +60,7 @@ export default defineEventHandler(async (event) => {
     permissions: [],
   });
 
-  // Use standard LangChain streamEvents v2 — iterates ALL events for the entire agent run.
-  // Avoids the deepagents v3 run.messages projection which closes after the first model
-  // invocation and misses the final response generated after tool calls complete.
-  const streamGen = agent.streamEvents({ messages: lcMessages }, { version: "v2" });
+  const run = await agent.streamEvents({ messages: lcMessages }, { version: "v3" });
 
   // Use Web ReadableStream (required for Vercel — Node.js Readable doesn't stream properly)
   const encoder = new TextEncoder();
@@ -83,62 +88,33 @@ export default defineEventHandler(async (event) => {
     streamController = null;
   }
 
+  // Tool calls — iterate run.toolCalls (registered by createToolCallTransformer in ReactAgent.compile)
+  // Cast needed because TypeScript loses the concrete TTools generic after createDeepAgent
+  const runAny = run as unknown as { toolCalls?: AsyncIterable<ToolCallStreamLike> };
+  if (runAny.toolCalls) {
+    (async () => {
+      for await (const call of runAny.toolCalls!) {
+        const [output, status] = await Promise.all([
+          call.output.catch(() => undefined),
+          call.status.catch(() => "error"),
+        ]);
+        pushEvent("tool_call", {
+          id: call.callId,
+          toolName: call.name,
+          input: call.input,
+          resultSummary: output != null ? String(output).slice(0, 200) : undefined,
+          status: status === "error" ? "error" : "done",
+        });
+      }
+    })().catch((err) => console.error("[deepagents] toolCalls error:", err));
+  }
+
+  // Message token streaming — uses run.messages projection (higher-level, works across all models)
   (async () => {
-    const pendingToolCalls = new Map<string, { toolName: string; input: unknown }>();
-
     try {
-      for await (const ev of streamGen) {
-        // Token streaming — fires for every model token throughout the ENTIRE run,
-        // including after tool calls (unlike run.messages which closes after the first invocation)
-        if (ev.event === "on_chat_model_stream") {
-          const content = (ev.data as { chunk?: { content?: unknown } })?.chunk?.content;
-          if (typeof content === "string" && content) {
-            pushEvent("token", content);
-          } else if (Array.isArray(content)) {
-            for (const block of content as { type?: string; text?: string }[]) {
-              if (block?.type === "text" && block.text) {
-                pushEvent("token", block.text);
-              }
-            }
-          }
-        }
-
-        // Tool start — push a "pending" event immediately for real-time UI feedback
-        else if (ev.event === "on_tool_start") {
-          const toolInput = (ev.data as { input?: unknown })?.input;
-          pendingToolCalls.set(ev.run_id, { toolName: ev.name, input: toolInput });
-          pushEvent("tool_call", {
-            id: ev.run_id,
-            toolName: ev.name,
-            input: toolInput ?? {},
-            status: "pending",
-          });
-        }
-
-        // Tool end — update with result summary
-        else if (ev.event === "on_tool_end") {
-          const pending = pendingToolCalls.get(ev.run_id);
-          pendingToolCalls.delete(ev.run_id);
-          const output = (ev.data as { output?: unknown })?.output;
-          pushEvent("tool_call", {
-            id: ev.run_id,
-            toolName: pending?.toolName ?? ev.name,
-            input: pending?.input ?? {},
-            resultSummary: output != null ? String(output).slice(0, 200) : undefined,
-            status: "done",
-          });
-        }
-
-        // Tool error
-        else if (ev.event === "on_tool_error") {
-          const pending = pendingToolCalls.get(ev.run_id);
-          pendingToolCalls.delete(ev.run_id);
-          pushEvent("tool_call", {
-            id: ev.run_id,
-            toolName: pending?.toolName ?? ev.name,
-            input: pending?.input ?? {},
-            status: "error",
-          });
+      for await (const msg of run.messages) {
+        for await (const token of msg.text) {
+          if (token) pushEvent("token", token);
         }
       }
     } catch (err) {
