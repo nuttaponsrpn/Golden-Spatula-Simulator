@@ -32,7 +32,7 @@
     </p>
     <button
       class="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold transition-colors"
-      @click="init"
+      @click="() => init()"
     >
       ลองใหม่
     </button>

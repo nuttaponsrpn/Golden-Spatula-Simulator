@@ -1,4 +1,5 @@
-import { fetchCurrentVersion } from "../../utils/gsVersion";
+import { defineEventHandler, getQuery } from "h3";
+import { fetchVersionByMode } from "../../utils/gsVersion";
 
 // Edition is hardcoded — the lineup JSON URL uses a content edition number
 // that is not present in the version config. Update this value when a new
@@ -28,9 +29,11 @@ export interface Lineup {
   detail: unknown;
 }
 
-export default defineEventHandler(async (_event) => {
+export default defineEventHandler(async (event) => {
   try {
-    const version = await fetchCurrentVersion();
+    const query = getQuery(event);
+    const mode = (query.mode as string) || "17";
+    const version = await fetchVersionByMode(mode);
 
     const seasonNumber = version.season.replace("S", "");
     const lineupUrl = `${LINEUP_BASE_URL}/m${seasonNumber}/${HARDCODED_EDITION}/${version.mode}/lineup_detail_total.json`;

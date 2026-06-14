@@ -4,11 +4,14 @@ import type { Champion } from "~/types/champion";
 import type { Trait } from "~/types/trait";
 import type { Item } from "~/types/item";
 
-export function createGsTools(apiBase: string) {
+export function createGsTools(apiBase: string, mode?: string) {
+  const query = mode ? { mode } : {};
+
   const getChampionsTool = tool(
     async (input) => {
       const raw = await $fetch<unknown>("/api/gs/champions", {
         baseURL: apiBase,
+        query,
       });
       const champions = raw as Champion[];
 
@@ -45,6 +48,7 @@ export function createGsTools(apiBase: string) {
     async (input) => {
       const raw = await $fetch<unknown>("/api/gs/traits", {
         baseURL: apiBase,
+        query,
       });
       const traits = raw as Trait[];
 
@@ -72,6 +76,7 @@ export function createGsTools(apiBase: string) {
     async (input) => {
       const raw = await $fetch<unknown>("/api/gs/items", {
         baseURL: apiBase,
+        query,
       });
       const items = raw as Item[];
 
@@ -97,6 +102,7 @@ export function createGsTools(apiBase: string) {
     async (input) => {
       const raw = await $fetch<unknown>("/api/gs/lineups", {
         baseURL: apiBase,
+        query,
       });
       const lineups = raw as Array<{ quality?: string }>;
 
@@ -122,6 +128,7 @@ export function createGsTools(apiBase: string) {
     async () => {
       const raw = await $fetch<unknown>("/api/gs/version", {
         baseURL: apiBase,
+        query,
       });
       return JSON.stringify(raw);
     },

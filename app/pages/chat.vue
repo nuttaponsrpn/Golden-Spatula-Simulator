@@ -147,7 +147,7 @@ definePageMeta({ ssr: false });
 useHead({ title: "Chat — Golden Spatula Simulator" });
 
 const route = useRoute();
-const { champions, items, init } = useGsData();
+const { champions, items, init, activeMode: gsActiveMode, activeVersionInfo: gsActiveVersionInfo } = useGsData();
 const { loadUnits } = useTeamBuilder();
 const { sessions, loadSessions, createSession, updateSession, deleteSession } = useChatSessions();
 const { showError } = useErrorHandler();
@@ -205,6 +205,8 @@ watch(activeSessionId, (sessionId) => {
       aiProvider,
       allChampions: champions,
       updateSession,
+      activeMode: gsActiveMode,
+      activeVersionInfo: gsActiveVersionInfo,
     },
   });
 }, { immediate: false });
@@ -244,12 +246,8 @@ onMounted(async () => {
     }
   }
 
-  const first = sessions.value[0];
-  if (first) {
-    switchSession(first.id);
-  } else {
-    startNewSession();
-  }
+  // Always start a new session if no specific ID requested (instead of loading the latest one)
+  startNewSession();
 });
 
 function startNewSession(): void {

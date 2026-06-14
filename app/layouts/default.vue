@@ -2,11 +2,26 @@
   <div class="min-h-screen overflow-x-hidden bg-gray-950 text-gray-100">
     <nav class="border-b border-gray-800 bg-gray-900 px-4 py-3">
       <div class="mx-auto flex max-w-screen-xl items-center justify-between">
-        <NuxtLink to="/chat" class="flex items-center gap-2 text-lg font-bold text-cost-5">
-          <span>&#9728;</span>
-          <span class="hidden sm:inline">Golden Spatula Simulator</span>
-          <span class="sm:hidden">GSS</span>
-        </NuxtLink>
+        <div class="flex items-center gap-4">
+          <NuxtLink to="/chat" class="flex items-center gap-2 text-lg font-bold text-cost-5 shrink-0">
+            <span>&#9728;</span>
+            <span class="hidden sm:inline">Golden Spatula Simulator</span>
+            <span class="sm:hidden">GSS</span>
+          </NuxtLink>
+
+          <!-- Version Selector -->
+          <div v-if="versions.length > 0" class="flex items-center">
+            <select
+              :value="activeMode"
+              class="bg-gray-800 border border-gray-700 text-xs text-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-cost-5"
+              @change="handleVersionChange"
+            >
+              <option v-for="v in versions" :key="v.mode" :value="v.mode">
+                {{ v.name }} ({{ v.version }})
+              </option>
+            </select>
+          </div>
+        </div>
 
         <!-- Desktop nav -->
         <div class="hidden sm:flex items-center gap-4 text-sm text-gray-400">
@@ -90,8 +105,18 @@
 
 <script setup lang="ts">
 const { error: globalError, clearGlobalError } = useGlobalError();
+const { versions, activeMode, init } = useGsData();
 const mobileMenuOpen = ref(false);
 const route = useRoute();
+
+const handleVersionChange = async (event: Event) => {
+  const select = event.target as HTMLSelectElement;
+  await init(select.value);
+};
+
+onMounted(async () => {
+  await init();
+});
 
 watch(() => route.path, () => {
   mobileMenuOpen.value = false;

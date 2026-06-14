@@ -8,12 +8,12 @@ export function createDeepAgentsProvider(_config: AiProviderConfig): AiProvider 
     async *sendMessage(
       messages: AiMessage[],
       systemPrompt: string,
-      opts?: AiStreamOptions,
+      opts?: AiStreamOptions & { activeMode?: string },
     ): AsyncIterableIterator<string> {
       const response = await fetch("/api/ai/deepagents", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages, systemPrompt }),
+        body: JSON.stringify({ messages, systemPrompt, activeMode: opts?.activeMode }),
         signal: opts?.signal,
       });
 

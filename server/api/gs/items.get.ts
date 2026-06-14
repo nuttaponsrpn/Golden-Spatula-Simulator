@@ -1,4 +1,5 @@
-import { fetchCurrentVersion, buildDataUrl } from "../../utils/gsVersion";
+import { defineEventHandler, getQuery } from "h3";
+import { fetchVersionByMode, buildDataUrl } from "../../utils/gsVersion";
 
 interface RawItem {
   id: string;
@@ -47,9 +48,11 @@ function mapCategory(type: string): ItemCategory {
   return CATEGORY_MAP[type] ?? "other";
 }
 
-export default defineEventHandler(async (_event) => {
+export default defineEventHandler(async (event) => {
   try {
-    const version = await fetchCurrentVersion();
+    const query = getQuery(event);
+    const mode = (query.mode as string) || "17";
+    const version = await fetchVersionByMode(mode);
     const url = buildDataUrl(version.equipurl);
 
     const text = await $fetch<string>(url, { parseResponse: (txt) => txt });

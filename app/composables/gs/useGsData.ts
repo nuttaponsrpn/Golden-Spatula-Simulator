@@ -18,6 +18,13 @@ import type { ApiRawTraitResponse } from "~/types/api-raw/trait";
 import type { ApiRawEquipResponse } from "~/types/api-raw/equip";
 import type { ApiRawLineupResponse } from "~/types/api-raw/lineup";
 
+export interface GsVersion {
+  version: string;
+  season: string;
+  name: string;
+  mode: string;
+}
+
 export const useGsData = () => {
   const champions = useState<Champion[]>("gs-champions", () => []);
   const traits = useState<Record<string, Trait>>("gs-traits", () => ({}));
@@ -26,24 +33,58 @@ export const useGsData = () => {
   const loading = useState<boolean>("gs-loading", () => false);
   const initialized = useState<boolean>("gs-initialized", () => false);
 
-  const init = async () => {
-    if (initialized.value) return { status: "success" };
+  const versions = useState<GsVersion[]>("gs-versions", () => []);
+  const activeMode = useState<string>("gs-active-mode", () => "17");
+  const activeVersionInfo = useState<GsVersion | null>("gs-active-version", () => null);
+
+  const init = async (mode?: string) => {
+    // If a specific mode is requested and it's different from the current one,
+    // we should re-initialize. Otherwise, if already initialized, skip.
+    if (initialized.value && (!mode || mode === activeMode.value)) return { status: "success" };
 
     loading.value = true;
     try {
-      if (import.meta.dev) console.log("[GS Data] Initializing data via proxy...");
+      if (mode) {
+        activeMode.value = mode;
+        initialized.value = false; // Reset to force re-fetch
+      }
+
+      if (import.meta.dev) console.log(`[GS Data] Initializing data for mode ${activeMode.value}...`);
+
+      // Fetch available versions first if not already fetched
+      if (versions.value.length === 0) {
+        const vResponse = await $fetch<GsVersion[]>("/api/gs/version");
+        versions.value = vResponse;
+      }
 
       const response = await $fetch<{
+        version: string;
+        mode: string;
+        name: string;
         chess: ApiRawChessResponse;
         trait: ApiRawTraitResponse;
         equip: ApiRawEquipResponse;
         lineup: ApiRawLineupResponse;
-      }>("/api/gs/data");
+      }>("/api/gs/data", {
+        params: { mode: activeMode.value }
+      });
 
-      const { chess: chessData, trait: traitData, equip: equipData, lineup: lineupData } = response;
+      const {
+        version,
+        mode: respMode,
+        name,
+        chess: chessData,
+        trait: traitData,
+        equip: equipData,
+        lineup: lineupData
+      } = response;
+
+      activeVersionInfo.value = { version, mode: respMode, name, season: "" };
 
       if (import.meta.dev) {
         console.log("[GS Data] Fetched data from proxy:", {
+          version,
+          mode: respMode,
           chess: !!chessData?.data,
           trait: !!traitData?.data,
           equip: !!equipData?.data,
@@ -69,16 +110,12 @@ export const useGsData = () => {
       const championMap: Record<string, Champion> = {};
 
       Object.values(chessData.data).forEach((raw) => {
-        // กรองเอาเฉพาะตัวที่ระบุว่าให้โชว์ (showHeroTag === "1") และเป็นฮีโร่จริง
-        // ตรวจสอบว่า class มีค่าและไม่ใช่ -1 (รวมถึงกรณี -1|-1)
         const hasValidClass = raw.class && raw.class.split("|").some(id => id !== "-1" && id !== "");
 
         if (raw.heroType === "0" && hasValidClass && (raw.showHeroTag === "1" || !championMap[raw.name])) {
           const champion = toChampion(raw, traitCheckIds);
 
-          // ตรวจสอบว่าหลังจากผ่าน adapter แล้วมี trait จริงๆ (เพื่อกรองพวกตัวประหลาดหรือมอนสเตอร์ออก)
           if (champion.traits.length > 0) {
-            // ถ้ายังไม่มีชื่อนี้ใน Map หรือตัวใหม่มี showHeroTag=1 ขณะที่ตัวเก่าไม่มี
             if (!championMap[champion.name] || (raw.showHeroTag === "1" && !championMap[champion.name])) {
               championMap[champion.name] = champion;
             }
@@ -92,7 +129,7 @@ export const useGsData = () => {
       // 3. Transform items
       const itemMap: Record<string, Item> = {};
       Object.values(equipData.data)
-        .filter((raw) => raw.planID === "17")
+        .filter((raw) => raw.planID === activeMode.value)
         .forEach((raw) => {
           if (!itemMap[raw.id]) {
             itemMap[raw.id] = toItem(raw);
@@ -124,6 +161,9 @@ export const useGsData = () => {
     lineups,
     loading,
     initialized,
+    versions,
+    activeMode,
+    activeVersionInfo,
     init,
   };
 };

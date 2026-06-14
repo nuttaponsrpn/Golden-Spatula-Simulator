@@ -59,7 +59,7 @@ export function useAiProvider() {
   function sendMessage(
     messages: AiMessage[],
     systemPrompt: string,
-    opts?: AiStreamOptions,
+    opts?: AiStreamOptions & { activeMode?: string },
   ):
     | { status: "success"; iterator: AsyncIterableIterator<string> }
     | { status: "error"; error: AppError } {

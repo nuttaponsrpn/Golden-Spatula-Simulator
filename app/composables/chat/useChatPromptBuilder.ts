@@ -5,6 +5,7 @@ interface PromptOptions {
   anchorChampions: Champion[];
   allChampions: Champion[];
   allItems: Item[];
+  versionName?: string;
 }
 
 const RESPONSE_FORMAT = `## Response Format
@@ -87,7 +88,7 @@ Wording example (in Thai):
 export function useChatPromptBuilder() {
   // Used by Claude / Gemini / Copilot — embeds full roster in the prompt
   function buildSystemPrompt(opts: PromptOptions): string {
-    const { anchorChampions, allChampions, allItems } = opts;
+    const { anchorChampions, allChampions, allItems, versionName } = opts;
 
     const anchorIds = new Set(anchorChampions.map((c) => c.id));
 
@@ -108,9 +109,11 @@ export function useChatPromptBuilder() {
         ? `\n## Anchor Champions\nThe following champions MUST be included in every team composition you suggest:\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
         : "";
 
+    const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+
     return `You are Golden Spatula, an expert advisor integrated into the Golden Spatula Simulator.
 You help players build optimal team compositions and answer questions about game mechanics, meta, and strategy.
-
+${versionSection}
 ## Champion Roster
 The following champions are available. Use ONLY these exact "id" values for championId when suggesting compositions.
 ${JSON.stringify(roster, null, 2)}
@@ -125,15 +128,17 @@ ${RESPONSE_FORMAT}`;
   }
 
   // Used by DeepAgents — NO embedded roster; agent must call tools to fetch live data
-  function buildDeepAgentsSystemPrompt(anchorChampions: Champion[]): string {
+  function buildDeepAgentsSystemPrompt(anchorChampions: Champion[], versionName?: string): string {
     const anchorSection =
       anchorChampions.length > 0
         ? `\n## Anchor Champions\nThe following champions MUST be included in every team composition you suggest:\n${anchorChampions.map((c) => `- ${c.name} (id: "${c.id}")`).join("\n")}\n`
         : "";
 
+    const versionSection = versionName ? `\n## Game Version\nCurrent version: "${versionName}"\n` : "";
+
     return `You are Golden Spatula, an expert advisor integrated into the Golden Spatula Simulator.
 You help players build optimal team compositions and answer questions about game mechanics, meta, and strategy.
-
+${versionSection}
 ## Tools — MANDATORY
 You have access to live data tools. You MUST call them before answering any composition or meta question.
 Do NOT use training knowledge for champion IDs, item IDs, or trait data — always fetch from tools first.

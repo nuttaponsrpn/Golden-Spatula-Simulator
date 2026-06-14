@@ -1,19 +1,22 @@
-import { fetchCurrentVersion } from "../../utils/gsVersion";
+import { fetchAllVersions } from "../../utils/gsVersion";
 
 export default defineEventHandler(async (_event) => {
   try {
-    const entry = await fetchCurrentVersion();
-    return {
-      version: entry.version,
-      season: entry.season,
-      name: entry.name,
-      mode: entry.mode,
-      herourl: entry.herourl,
-      traiturl: entry.traiturl,
-      equipurl: entry.equipurl,
-      hexurl: entry.hexurl,
-      godurl: entry.godurl,
-    };
+    const entries = await fetchAllVersions();
+    // Return all versions where is_newest_version is 1
+    return entries
+      .filter((e: any) => e.is_newest_version === 1)
+      .map((entry) => ({
+        version: entry.version,
+        season: entry.season,
+        name: entry.name,
+        mode: entry.mode,
+        herourl: entry.herourl,
+        traiturl: entry.traiturl,
+        equipurl: entry.equipurl,
+        hexurl: entry.hexurl,
+        godurl: entry.godurl,
+      }));
   } catch (error: unknown) {
     if (
       typeof error === "object" &&

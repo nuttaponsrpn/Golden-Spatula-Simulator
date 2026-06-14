@@ -13,21 +13,30 @@ export interface GsVersionEntry {
   godurl: string;
 }
 
-export async function fetchCurrentVersion(): Promise<GsVersionEntry> {
+export async function fetchAllVersions(): Promise<GsVersionEntry[]> {
   const text = await $fetch<string>(VERSION_CONFIG_URL, {
     parseResponse: (txt) => txt,
   });
   const entries = JSON.parse(text.trim()) as Array<Record<string, unknown>>;
+  return entries as unknown as GsVersionEntry[];
+}
+
+export async function fetchVersionByMode(mode: string): Promise<GsVersionEntry> {
+  const entries = await fetchAllVersions();
   const entry = entries.find(
-    (e) => e["is_newest_version"] === 1 && e["mode"] === "17"
+    (e) => (e as any)["is_newest_version"] === 1 && e["mode"] === mode
   );
   if (!entry) {
     throw createError({
-      statusCode: 502,
-      statusMessage: "No active mode-17 version found",
+      statusCode: 404,
+      statusMessage: `Active version for mode ${mode} not found`,
     });
   }
   return entry as unknown as GsVersionEntry;
+}
+
+export async function fetchCurrentVersion(): Promise<GsVersionEntry> {
+  return fetchVersionByMode("17");
 }
 
 export function buildDataUrl(path: string): string {

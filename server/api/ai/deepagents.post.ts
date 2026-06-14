@@ -19,6 +19,7 @@ export const maxDuration = 300;
 interface DeepAgentsRequestBody {
   messages: { role: "user" | "assistant"; content: string }[];
   systemPrompt: string;
+  activeMode?: string;
 }
 
 export default defineEventHandler(async (event) => {
@@ -42,7 +43,7 @@ export default defineEventHandler(async (event) => {
   // Use absolute internal URL so $fetch in gs-tools resolves correctly on the server
   const host = getRequestHost(event, { xForwardedHost: false });
   const protocol = event.node.req.socket && "encrypted" in event.node.req.socket ? "https" : "http";
-  const tools = createGsTools(`${protocol}://${host}`);
+  const tools = createGsTools(`${protocol}://${host}`, body.activeMode);
 
   const agent = createDeepAgent({
     model: "google-genai:gemini-2.5-pro",

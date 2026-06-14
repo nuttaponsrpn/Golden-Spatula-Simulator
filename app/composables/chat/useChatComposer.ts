@@ -14,6 +14,7 @@ import type { AiMessage } from "~/types/ai-provider";
 import type { AppError } from "~/types/app-error";
 import type { Ref } from "vue";
 import { normalizeError } from "~/utils/error";
+import type { GsVersion } from "../gs/useGsData";
 
 // Injected dependencies — composables that require Vue setup context
 // are passed in so useChatComposer can be called inside watch callbacks
@@ -21,6 +22,8 @@ export interface ComposerDeps {
   aiProvider: ReturnType<typeof useAiProvider>;
   allChampions: Ref<Champion[]>;
   updateSession: ReturnType<typeof useChatSessions>["updateSession"];
+  activeMode: Ref<string>;
+  activeVersionInfo: Ref<GsVersion | null>;
 }
 
 const BOARD_ROWS = 4;
@@ -122,6 +125,7 @@ function mapAiCompToUnits(
 
   const defaultPositions = generateBoardPositions();
   const usedPositions = new Set<string>();
+  const usedChampionIds = new Set<string>();
   const result: PlacedUnits = [];
 
   for (let i = 0; i < Math.min(units.length, MAX_UNITS); i++) {
@@ -132,7 +136,8 @@ function mapAiCompToUnits(
     const champion =
       champions.find((c) => c.id === spec.championId) ??
       champions.find((c) => c.name.toLowerCase() === spec.championId.toLowerCase());
-    if (!champion) continue;
+    
+    if (!champion || usedChampionIds.has(champion.id)) continue;
 
     let position = spec.position;
 
@@ -161,6 +166,7 @@ function mapAiCompToUnits(
     if (!position) continue;
 
     usedPositions.add(`${position.row},${position.col}`);
+    usedChampionIds.add(champion.id);
 
     const unitItems: UnitItems = [null, null, null];
     for (let s = 0; s < Math.min(spec.items.length, 3); s++) {
@@ -243,12 +249,15 @@ export function useChatComposer(opts: ComposerOptions) {
 
     // DeepAgents fetches live data via tools — do not embed roster in prompt
     const isDeepAgents = aiProvider.config.value?.kind === "deepagents";
+    const versionName = deps.activeVersionInfo.value?.name;
+
     const systemPrompt = isDeepAgents
-      ? promptBuilder.buildDeepAgentsSystemPrompt(anchorChampions)
+      ? promptBuilder.buildDeepAgentsSystemPrompt(anchorChampions, versionName)
       : promptBuilder.buildSystemPrompt({
           anchorChampions,
           allChampions: champions,
           allItems: items,
+          versionName,
         });
 
     const userMsg: ChatMessage = {
@@ -289,6 +298,7 @@ export function useChatComposer(opts: ComposerOptions) {
       systemPrompt,
       {
         signal: abortController.signal,
+        activeMode: deps.activeMode.value,
         onToolCall: (step) => {
           const existing = streamingToolCalls.value.findIndex((s) => s.id === step.id);
           if (existing >= 0) {
